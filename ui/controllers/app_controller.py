@@ -72,12 +72,12 @@ class AppController(QObject):
     def start_browser(self):
         self.stop_event.clear()
         self.login_confirmed_event.clear()
-        self.status_signal.emit("Conectando Chrome...", "white")
+        self.status_signal.emit("Conectando Edge...", "white")
 
         def boot_task():
             self.logger.info("INICIANDO SISTEMA...", extra={'tags': 'DESTAK'})
             self.automation = AutomationLogic(self.logger, self.stop_event, self.config_manager)
-            sucesso = self.automation.garantir_chrome_aberto()
+            sucesso = self.automation.garantir_edge_aberto()
             if not sucesso:
                 self.logger.error("Falha crítica ao abrir navegador.")
                 self.execution_error.emit("Falha crítica ao abrir navegador.")

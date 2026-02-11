@@ -9,7 +9,7 @@ import socket
 import traceback
 
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,8 +17,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException, StaleElementReferenceException, NoSuchElementException
 
 from core.constants import (
-    CHROME_DEBUG_PORT,
-    CHROME_PROFILE_PATH,
+    EDGE_DEBUG_PORT,
+    EDGE_PROFILE_PATH,
     URLS_ABERTURA,
     URL_ALVO,
     MESES_DEFESO_PADRAO,
@@ -53,44 +53,44 @@ class AutomationLogic:
         text = text.replace("R$", "").replace("\u00a0", "").strip()
         return text.lower()
 
-    # --- CHROME ENGINE ---
+    # --- EDGE ENGINE ---
     def is_port_in_use(self, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex(('127.0.0.1', port)) == 0
 
-    def encontrar_executavel_chrome(self):
+    def encontrar_executavel_edge(self):
         caminhos = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\Application\msedge.exe")
         ]
         for c in caminhos:
             if os.path.exists(c):
                 return c
         return None
 
-    def fechar_chrome_brutalmente(self):
+    def fechar_edge_brutalmente(self):
         try:
-            subprocess.run("taskkill /f /im chrome.exe", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run("taskkill /f /im msedge.exe", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
 
-    def garantir_chrome_aberto(self):
-        if self.is_port_in_use(CHROME_DEBUG_PORT):
-            self.logger.info("Chrome já está rodando na porta de debug. Conectando...", extra={'tags': 'SUCCESS'})
+    def garantir_edge_aberto(self):
+        if self.is_port_in_use(EDGE_DEBUG_PORT):
+            self.logger.info("Edge já está rodando na porta de debug. Conectando...", extra={'tags': 'SUCCESS'})
             return True
 
-        self.logger.info("Iniciando nova instância do Chrome...", extra={'tags': 'INFO'})
-        chrome_exe = self.encontrar_executavel_chrome()
+        self.logger.info("Iniciando nova instância do Edge...", extra={'tags': 'INFO'})
+        edge_exe = self.encontrar_executavel_edge()
 
-        if chrome_exe:
-            if not os.path.exists(CHROME_PROFILE_PATH):
-                try: os.makedirs(CHROME_PROFILE_PATH, exist_ok=True)
+        if edge_exe:
+            if not os.path.exists(EDGE_PROFILE_PATH):
+                try: os.makedirs(EDGE_PROFILE_PATH, exist_ok=True)
                 except: pass
 
             cmd = [
-                chrome_exe,
-                f"--remote-debugging-port={CHROME_DEBUG_PORT}",
-                rf"--user-data-dir={CHROME_PROFILE_PATH}",
+                edge_exe,
+                f"--remote-debugging-port={EDGE_DEBUG_PORT}",
+                rf"--user-data-dir={EDGE_PROFILE_PATH}",
                 "--no-first-run", "--no-default-browser-check", "--start-maximized",
                 "--disable-popup-blocking"
             ] + URLS_ABERTURA
@@ -102,16 +102,16 @@ class AutomationLogic:
             )
             for i in range(20):
                 time.sleep(0.5)
-                if self.is_port_in_use(CHROME_DEBUG_PORT):
+                if self.is_port_in_use(EDGE_DEBUG_PORT):
                     return True
         return False
 
     def conectar_selenium(self):
         self.logger.info("Tentando conectar Selenium ao navegador...")
-        opts = Options()
-        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{CHROME_DEBUG_PORT}")
+        opts = EdgeOptions()
+        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{EDGE_DEBUG_PORT}")
         try:
-            self.driver = webdriver.Chrome(options=opts)
+            self.driver = webdriver.Edge(options=opts)
             # Teste de vida
             _ = self.driver.current_window_handle
             self.logger.info("Conexão Selenium ESTABELECIDA com sucesso!", extra={'tags': 'SUCCESS'})
@@ -121,8 +121,8 @@ class AutomationLogic:
             return None
 
     def obter_driver_robusto(self):
-        if not self.is_port_in_use(CHROME_DEBUG_PORT):
-            self.garantir_chrome_aberto()
+        if not self.is_port_in_use(EDGE_DEBUG_PORT):
+            self.garantir_edge_aberto()
 
         driver = self.conectar_selenium()
         
@@ -134,10 +134,10 @@ class AutomationLogic:
             driver = None
 
         if not driver:
-            self.logger.warning("Conexão falhou ou driver 'zumbi'. Reiniciando Chrome...")
-            self.fechar_chrome_brutalmente()
+            self.logger.warning("Conexão falhou ou driver 'zumbi'. Reiniciando Edge...")
+            self.fechar_edge_brutalmente()
             time.sleep(1)
-            self.garantir_chrome_aberto()
+            self.garantir_edge_aberto()
             driver = self.conectar_selenium()
         
         self.driver = driver

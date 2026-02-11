@@ -6,7 +6,7 @@ import sys
 # ==============================================================================
 
 VERSION = "1.0.3.0"
-CHROME_DEBUG_PORT = 9222
+EDGE_DEBUG_PORT = 9555
 BASE_DIR = r"C:\chrome_reap"
 CONFIG_FILE = os.path.join(BASE_DIR, "autoreapmpa.json")
 
@@ -38,7 +38,7 @@ if not os.path.exists(BASE_DIR):
 
 # Define o arquivo de log fixo dentro de C:\chrome_reap
 LOG_FILE = os.path.join(BASE_DIR, "reap_debug_log.txt")
-CHROME_PROFILE_PATH = BASE_DIR
+EDGE_PROFILE_PATH = BASE_DIR
 
 # URLs para abrir automaticamente
 URLS_ABERTURA = [

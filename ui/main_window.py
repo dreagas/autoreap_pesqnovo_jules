@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
             return btn
 
         # Sidebar Buttons
-        self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png", obj_name="BoldButton")
+        self.btn_reconnect = create_btn(" CONECTAR EDGE", "img_edge.png", obj_name="BoldButton")
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
 
@@ -734,7 +734,7 @@ class MainWindow(QMainWindow):
                  
     @Slot()
     def show_login_popup(self):
-        dlg = ModernMessageBox("LOGIN NECESSÁRIO", "O Chrome foi aberto.\n\nPor favor, faça o LOGIN no Gov.br.\n\nQuando estiver logado, clique abaixo.", "INFO", self)
+        dlg = ModernMessageBox("LOGIN NECESSÁRIO", "O Edge foi aberto.\n\nPor favor, faça o LOGIN no Gov.br.\n\nQuando estiver logado, clique abaixo.", "INFO", self)
         dlg.btn_ok.setText("JÁ ESTOU LOGADO")
         dlg.exec()
         self.controller.confirm_login()
