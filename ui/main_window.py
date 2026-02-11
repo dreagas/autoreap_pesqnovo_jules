@@ -317,9 +317,8 @@ class MainWindow(QMainWindow):
             self.btn_cloud_sync.setIcon(QIcon(icon_path))
             self.btn_cloud_sync.setIconSize(QSize(24, 24))
         
-        # Estilo Roxo para diferenciar
         self.btn_cloud_sync.setStyleSheet("""
-            QPushButton { background-color: #7C3AED; border: 1px solid #6D28D9; font-size: 13px; color: white; font-weight: bold; border-radius: 8px; min-height: 40px; }
+            QPushButton { background-color: #0284C7; border: 1px solid #6D28D9; font-size: 13px; color: white; font-weight: bold; border-radius: 8px; min-height: 40px; }
             QPushButton:hover { background-color: #6D28D9; }
         """)
         self.btn_cloud_sync.clicked.connect(self.download_cloud_config)

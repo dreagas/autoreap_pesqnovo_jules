@@ -5,27 +5,38 @@ import sys
 #  CONSTANTES GLOBAIS
 # ==============================================================================
 
-VERSION = "1.0.2.1"
+VERSION = "1.0.3.0"
 CHROME_DEBUG_PORT = 9222
 BASE_DIR = r"C:\chrome_reap"
 CONFIG_FILE = os.path.join(BASE_DIR, "autoreapmpa.json")
 
-# Caminho da aplicação (para achar a pasta img/, etc)
-if getattr(sys, 'frozen', False):
-    APP_PATH = os.path.dirname(sys.executable)
-else:
-    # Se estiver rodando como script, sobe um nível pois este arquivo está em /core
-    APP_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def resource_path(relative_path):
+    """ Obtém o caminho absoluto para recursos, funciona para dev e para PyInstaller """
+    try:
+        # PyInstaller cria uma pasta temporária e armazena o caminho em _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Se não estiver rodando como EXE, usa o caminho do projeto
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            # Sobe um nível pois este arquivo está em /core
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# CAMINHO DAS IMAGENS
-IMG_DIR = os.path.join(APP_PATH, "img")
+    return os.path.join(base_path, relative_path)
+
+# Caminho da aplicação (Raiz dos recursos)
+APP_PATH = resource_path("")
+
+# CAMINHO DAS IMAGENS (Sempre resolvido via resource_path)
+IMG_DIR = resource_path("img")
 
 # Garante que a pasta C:\chrome_reap exista para salvar logs e configs
 if not os.path.exists(BASE_DIR):
     try: os.makedirs(BASE_DIR)
     except: pass
 
-# Define explicitamente o arquivo de log dentro de C:\chrome_reap
+# Define o arquivo de log fixo dentro de C:\chrome_reap
 LOG_FILE = os.path.join(BASE_DIR, "reap_debug_log.txt")
 CHROME_PROFILE_PATH = BASE_DIR
 
@@ -36,7 +47,7 @@ URLS_ABERTURA = [
     "https://login.esocial.gov.br/",
     "https://cav.receita.fazenda.gov.br/"
 ]
-URL_ALVO = URLS_ABERTURA[0] # Link da Manutenção
+URL_ALVO = URLS_ABERTURA[0]
 
 # Listas de Meses
 MESES_DEFESO_PADRAO = ["Janeiro", "Fevereiro", "Março", "Dezembro"]
