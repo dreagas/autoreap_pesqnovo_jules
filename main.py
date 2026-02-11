@@ -1,7 +1,8 @@
 import sys
 import os
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from ui.main_window import MainWindow
+from services.updater import LicenseUpdater
 
 def load_stylesheet(app):
     try:
@@ -18,6 +19,39 @@ def main():
 
     # Set app info if needed
     app.setApplicationName("Automação REAP")
+
+    # --- VERIFICAÇÃO DE LICENÇA E ATUALIZAÇÃO ---
+    print("[INIT] Iniciando verificação de licença e atualizações...")
+    updater = LicenseUpdater()
+
+    # 1. Validar Licença
+    valido, msg, dados_licenca = updater.validar_licenca()
+
+    if not valido:
+        print(f"[ERRO] Licença inválida: {msg}")
+        QMessageBox.critical(None, "Erro de Licença", f"Falha na validação da licença:\n{msg}")
+        sys.exit(1)
+
+    print(f"[SUCESSO] Licença validada: {msg}")
+
+    # 2. Verificar Atualização (se estiver online e válido)
+    if dados_licenca:
+        tem_update, url_download = updater.verificar_atualizacao(dados_licenca)
+
+        if tem_update and url_download:
+            print("[INFO] Atualização disponível encontrada.")
+            resposta = QMessageBox.question(
+                None,
+                "Atualização Disponível",
+                "Uma nova versão do programa está disponível.\nDeseja baixar e atualizar agora?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if resposta == QMessageBox.Yes:
+                updater.realizar_atualizacao(url_download)
+                # O método realizar_atualizacao fecha o app se funcionar o update em .exe
+                # Se continuar aqui, algo falhou ou é script .py
+    # ---------------------------------------------
 
     load_stylesheet(app)
 
