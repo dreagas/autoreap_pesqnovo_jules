@@ -33,7 +33,8 @@ else:
     # Assuming this file is in core/constants.py, go up one level
     APP_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-LOG_FILE = os.path.join(APP_PATH, "reap_debug_log.txt")
+# Log must be in chrome_reap folder as requested
+LOG_FILE = os.path.join(BASE_DIR, "reap_debug_log.txt")
 CHROME_PROFILE_PATH = BASE_DIR
 
 # URLs para abrir automaticamente

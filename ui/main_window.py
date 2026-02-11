@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QGroupBox, QCheckBox, QApplication
 )
 from PySide6.QtCore import Qt, Slot, QSize, QTimer
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon, QAction, QFontDatabase
 
 from ui.controllers.app_controller import AppController
 from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox
@@ -17,6 +17,9 @@ import os
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Set Object Name for QSS targeting
+        self.setObjectName("MainWindow")
+
         self.setWindowTitle(f"Automação REAP v{VERSION}")
         self.resize(1100, 750)
 
@@ -54,6 +57,14 @@ class MainWindow(QMainWindow):
         self.controller.year_finished.connect(self.on_year_finished)
         self.controller.execution_error.connect(self.on_execution_error)
 
+    def get_icon(self, name):
+        """Helper to load icon or return empty QIcon if missing."""
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        icon_path = os.path.join(base_path, "ui", "img", name)
+        if os.path.exists(icon_path):
+            return QIcon(icon_path)
+        return QIcon()
+
     def create_sidebar(self):
         sidebar = QFrame()
         sidebar.setStyleSheet("background-color: #1E293B; border-right: 1px solid #335c81;")
@@ -65,6 +76,7 @@ class MainWindow(QMainWindow):
 
         # Title
         title = QLabel("REAP AUTO")
+        # Inline style for specific header look
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #60A5FA; border: none;")
         layout.addWidget(title)
 
@@ -79,17 +91,23 @@ class MainWindow(QMainWindow):
 
         # Buttons
         self.btn_reconnect = QPushButton("RECONECTAR CHROME")
+        self.btn_reconnect.setIcon(self.get_icon("img_chrome.png"))
+        self.btn_reconnect.setIconSize(QSize(24, 24))
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
 
         self.btn_open_tabs = QPushButton("ABRIR ABAS DE TRABALHO")
+        self.btn_open_tabs.setIcon(self.get_icon("img_abas.png"))
+        self.btn_open_tabs.setIconSize(QSize(24, 24))
         self.btn_open_tabs.clicked.connect(self.controller.open_tabs)
         layout.addWidget(self.btn_open_tabs)
 
         self.btn_search = QPushButton("ATUALIZAR LISTA")
         self.btn_search.clicked.connect(lambda: self.controller.run_search(force_new=True))
         self.btn_search.setEnabled(False)
-        self.btn_search.setStyleSheet("QPushButton { background-color: #0891B2; } QPushButton:disabled { background-color: #334155; }")
+        # QSS handles generic button style, but disabled state is also handled there.
+        # We can remove inline styles or keep them if they are very specific.
+        # Since we want "modern and cohesive", let's trust the QSS.
         layout.addWidget(self.btn_search)
 
         self.btn_logs = QPushButton("VER LOGS")
@@ -100,6 +118,7 @@ class MainWindow(QMainWindow):
 
         self.btn_stop = QPushButton("PARAR TUDO")
         self.btn_stop.clicked.connect(self.controller.stop_automation)
+        # Keep specific Danger color for Stop button
         self.btn_stop.setStyleSheet("background-color: #EF4444;")
         self.btn_stop.setEnabled(False)
         layout.addWidget(self.btn_stop)
@@ -173,6 +192,7 @@ class MainWindow(QMainWindow):
         # Dynamic List (Scroll Area)
         list_scroll = QScrollArea()
         list_scroll.setWidgetResizable(True)
+        # Remove inline style to let QSS handle it, or keep minimal structural styles
         list_scroll.setStyleSheet("QScrollArea { border: 1px solid #335c81; border-radius: 6px; background-color: #1E293B; }")
 
         self.dynamic_list_container = QWidget()
@@ -331,6 +351,7 @@ class MainWindow(QMainWindow):
         row_layout.addWidget(kg, stretch=1)
 
         btn_del = QPushButton("X")
+        # Keep explicit Red for delete
         btn_del.setStyleSheet("background-color: #EF4444; width: 30px;")
         btn_del.setFixedWidth(30)
         btn_del.clicked.connect(lambda: self.remove_species_row(row_widget))
@@ -509,9 +530,12 @@ class MainWindow(QMainWindow):
             if sent:
                 btn.setText(f"{year} (JÁ ENVIADO)")
                 btn.setEnabled(False)
+                # Keep grey for sent items
                 btn.setStyleSheet("background-color: #475569; color: gray; font-weight: bold;")
             else:
                 btn.setText(f"PROCESSAR {year}")
+                # Keep explicit Blue for Process button, or let QSS handle if it matches generic?
+                # QSS sets generic to #2563eb which is similar. But explicit style ensures it.
                 btn.setStyleSheet("background-color: #2563EB; font-weight: bold;")
                 btn.clicked.connect(lambda checked=False, i=idx, y=year: self.controller.run_year(i, y))
 
