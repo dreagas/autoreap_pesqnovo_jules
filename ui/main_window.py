@@ -17,7 +17,7 @@ import os
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Automação REAP v{VERSION}")
+        self.setWindowTitle(f"AutoREAPv2 - v{VERSION}")
         self.resize(1100, 750) 
 
         # Controller
@@ -26,6 +26,8 @@ class MainWindow(QMainWindow):
 
         # Central Widget
         central_widget = QWidget()
+        central_widget.setObjectName("CentralWidget")
+        central_widget.setAttribute(Qt.WA_StyledBackground, True) # Garante renderização do fundo
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -58,7 +60,7 @@ class MainWindow(QMainWindow):
 
     def create_sidebar(self):
         sidebar = QFrame()
-        sidebar.setObjectName("Sidebar")
+        sidebar.setObjectName("Sidebar") # CSS: #1E293B
         sidebar.setFixedWidth(280)
 
         layout = QVBoxLayout(sidebar)
@@ -80,8 +82,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.lbl_status)
 
         # Buttons Helper
-        def create_btn(text, icon_name=None, color_style=None):
+        def create_btn(text, icon_name=None, color_style=None, obj_name=None):
             btn = QPushButton(text)
+            if obj_name:
+                btn.setObjectName(obj_name)
             if icon_name:
                 icon_path = os.path.join(IMG_DIR, icon_name)
                 if os.path.exists(icon_path):
@@ -93,38 +97,42 @@ class MainWindow(QMainWindow):
                 
             return btn
 
-        # Sidebar Buttons
-        self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png")
-        self.btn_reconnect.setObjectName("BoldButton") 
+        # Sidebar Buttons - Todos com estilo Bold/Roboto (usando BoldButton do QSS ou style direto se necessário)
+        # BoldButton já define font-weight: 900 e Roboto via QSS global
+        
+        self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png", obj_name="BoldButton")
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
 
-        self.btn_open_tabs = create_btn(" ABRIR ABAS", "img_abas.png")
+        self.btn_open_tabs = create_btn(" ABRIR ABAS", "img_abas.png", obj_name="BoldButton")
         self.btn_open_tabs.clicked.connect(self.controller.open_tabs)
         layout.addWidget(self.btn_open_tabs)
 
-        self.btn_search = create_btn(" ATUALIZAR LISTA", "img_atualizar.png")
+        self.btn_search = create_btn(" ATUALIZAR LISTA", "img_atualizar.png", obj_name="BoldButton")
         self.btn_search.clicked.connect(lambda: self.controller.run_search(force_new=True))
         self.btn_search.setEnabled(False)
         layout.addWidget(self.btn_search)
 
-        self.btn_logs = create_btn(" VER LOGS COMPLETO", "img_log.png")
+        self.btn_logs = create_btn(" VER LOGS COMPLETO", "img_log.png", obj_name="BoldButton")
         self.btn_logs.clicked.connect(self.open_logs)
         layout.addWidget(self.btn_logs)
 
         layout.addStretch()
 
-        # PARAR TUDO (Borda Vermelha Forçada)
-        self.btn_stop = create_btn(" PARAR TUDO", "img_parar.png")
-        self.btn_stop.setObjectName("BoldButton")
+        # PARAR TUDO (Borda Vermelha Forçada e Estilo Vermelho)
+        self.btn_stop = create_btn(" PARAR TUDO", "img_parar.png", obj_name="StopButton")
         self.btn_stop.clicked.connect(self.on_stop_clicked)
-        # Estilo específico com borda vermelha explícita
+        self.btn_stop.setEnabled(False)
+        # Forçando estilo vermelho via stylesheet direto para garantir
         self.btn_stop.setStyleSheet("""
-            QPushButton#BoldButton { 
+            QPushButton { 
                 background-color: #EF4444; 
-                border: 2px solid #B91C1C; /* Borda Vermelho Escuro */
-            } 
-            QPushButton#BoldButton:hover { 
+                border: 2px solid #B91C1C; 
+                color: white; 
+                font-weight: 900; 
+                font-family: 'Roboto';
+            }
+            QPushButton:hover { 
                 background-color: #DC2626; 
                 border-color: #991B1B;
             }
@@ -134,7 +142,6 @@ class MainWindow(QMainWindow):
                 color: #475569; 
             }
         """)
-        self.btn_stop.setEnabled(False)
         layout.addWidget(self.btn_stop)
 
         return sidebar
@@ -166,6 +173,7 @@ class MainWindow(QMainWindow):
         list_scroll.setFixedHeight(220)
         
         self.dynamic_list_container = QWidget()
+        self.dynamic_list_container.setAttribute(Qt.WA_StyledBackground, True) # Garante fundo azul
         self.dynamic_list_layout = QVBoxLayout(self.dynamic_list_container)
         self.dynamic_list_layout.setContentsMargins(0, 0, 5, 0)
         self.dynamic_list_layout.setSpacing(10)
@@ -187,7 +195,7 @@ class MainWindow(QMainWindow):
         mun_header.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 14px; background: transparent;")
         mun_layout.addWidget(mun_header)
         
-        # Fundo transparente garantido
+        # Correção do fundo escuro: background transparent
         lbl_hint = QLabel("(Clique na seta abaixo para alterar)")
         lbl_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-bottom: 2px; background: transparent;")
         mun_layout.addWidget(lbl_hint)
@@ -266,6 +274,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
+        content.setAttribute(Qt.WA_StyledBackground, True) # CORREÇÃO CRÍTICA: Garante que o CSS pinte o fundo
         self.cfg_layout = QVBoxLayout(content)
         self.cfg_layout.setContentsMargins(0, 0, 0, 0)
         self.cfg_layout.setSpacing(25)
@@ -276,7 +285,7 @@ class MainWindow(QMainWindow):
 
         def create_section_container(title):
             frame = QFrame()
-            frame.setObjectName("ConfigSection")
+            frame.setObjectName("ConfigSection") # CSS: #1E293B
             f_layout = QVBoxLayout(frame)
             f_layout.setContentsMargins(25, 25, 25, 25)
             f_layout.setSpacing(15)
@@ -299,6 +308,13 @@ class MainWindow(QMainWindow):
             lbl.setStyleSheet("font-weight: bold; color: #E2E8F0; background: transparent;")
             grid_layout.addWidget(lbl, row_idx, 0)
             val_init = self.controller.config_manager.data.get(key, "")
+            
+            # Lógica de exibição da Variação (Inteiro para interface)
+            if key == "variacao_peso_pct":
+                try:
+                    val_init = int(float(val_init) * 100)
+                except: pass
+
             widget = None
             if kind == "entry":
                 widget = QLineEdit(str(val_init))
@@ -361,16 +377,27 @@ class MainWindow(QMainWindow):
 
         s5_frame, s5_layout, _ = create_section_container("CATÁLOGO DE ESPÉCIES")
         
-        # --- CABEÇALHO PARA O CATÁLOGO (CORREÇÃO SOLICITADA) ---
+        # --- CABEÇALHO PARA O CATÁLOGO ---
         header_row = QWidget()
         h_layout = QHBoxLayout(header_row)
-        h_layout.setContentsMargins(0, 0, 0, 0)
-        # Background transparente para labels
-        lbl_style = "color: #94A3B8; font-size: 12px; font-weight: bold; background: transparent;"
-        h_layout.addWidget(QLabel("Nome da Espécie", styleSheet=lbl_style), stretch=3)
-        h_layout.addWidget(QLabel("Preço (R$)", styleSheet=lbl_style), stretch=1)
-        h_layout.addWidget(QLabel("Kg Base", styleSheet=lbl_style), stretch=1)
-        h_layout.addSpacing(40) 
+        h_layout.setContentsMargins(0, 0, 0, 5)
+        
+        lbl_style = "color: #38BDF8; font-size: 13px; font-weight: bold; background: transparent; text-transform: uppercase;"
+        
+        lbl_nome = QLabel("Nome da Espécie")
+        lbl_nome.setStyleSheet(lbl_style)
+        h_layout.addWidget(lbl_nome, stretch=3)
+        
+        lbl_preco = QLabel("Preço (R$)")
+        lbl_preco.setStyleSheet(lbl_style)
+        h_layout.addWidget(lbl_preco, stretch=1)
+        
+        lbl_kg = QLabel("Kg Base")
+        lbl_kg.setStyleSheet(lbl_style)
+        h_layout.addWidget(lbl_kg, stretch=1)
+        
+        h_layout.addSpacing(40) # Espaço para o botão remover
+        
         s5_layout.addWidget(header_row)
         
         self.species_container = QWidget()
@@ -391,6 +418,7 @@ class MainWindow(QMainWindow):
 
         self.cfg_layout.addSpacing(20)
 
+        # --- REVERTENDO PARA BOTÕES DIRETAMENTE NO LAYOUT (SEM CARD/FRAME ESCURO) ---
         btn_save_all = QPushButton(" SALVAR TODAS AS CONFIGURAÇÕES")
         btn_save_all.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_salvar.png")
@@ -408,6 +436,8 @@ class MainWindow(QMainWindow):
             btn_reset.setIconSize(QSize(24, 24))
         btn_reset.clicked.connect(self.reset_config)
         self.cfg_layout.addWidget(btn_reset)
+
+        self.cfg_layout.addStretch() # Empurra tudo para cima
 
         scroll.setWidget(content)
         main_tab_layout.addWidget(scroll)
@@ -428,13 +458,13 @@ class MainWindow(QMainWindow):
         row_layout = QHBoxLayout(row_widget)
         row_layout.setContentsMargins(0,0,0,0)
         name = QLineEdit(data["nome"])
-        name.setPlaceholderText("Nome da espécie...")
+        name.setPlaceholderText("Ex: Curimatã")
         row_layout.addWidget(name, stretch=3)
         price = QLineEdit(str(data["preco"]))
-        price.setPlaceholderText("Preço")
+        price.setPlaceholderText("0.00")
         row_layout.addWidget(price, stretch=1)
         kg = QLineEdit(str(data["kg_base"]))
-        kg.setPlaceholderText("Kg Base")
+        kg.setPlaceholderText("00")
         row_layout.addWidget(kg, stretch=1)
         btn_del = QPushButton()
         icon_path = os.path.join(IMG_DIR, "img_remover.png")
@@ -463,12 +493,12 @@ class MainWindow(QMainWindow):
     def on_municipio_change(self, text):
         self.entry_mun_manual.setVisible(text == "Outros")
 
-    # SLOT PARA AVISO DE PARADA
+    # SLOT PARA AVISO DE PARADA ATUALIZADO
     def on_stop_clicked(self):
         self.controller.stop_automation()
         ModernMessageBox(
             "PARADO", 
-            "Automação interrompida com sucesso.\n\nPara continuar, utilize a opção 'CONECTAR CHROME'.", 
+            "Automação interrompida com sucesso.\n\nPara continuar, é necessário reiniciar a conexão utilizando a opção 'CONECTAR CHROME' no menu.", 
             "WARNING", 
             self
         ).exec()
@@ -485,15 +515,27 @@ class MainWindow(QMainWindow):
         for key, widget in self.config_widgets.items():
             if isinstance(widget, QLineEdit):
                 val = widget.text()
-                if key in ["dias_min", "dias_max", "meta_financeira_min", "meta_financeira_max", "variacao_peso_pct"]:
+                
+                # Conversão Numérica
+                if key in ["dias_min", "dias_max", "meta_financeira_min", "meta_financeira_max"]:
                     try: val = float(val) if '.' in val else int(val)
                     except: pass
+                
+                # Tratamento especial para Porcentagem (Inteiro -> Float 0.xx)
+                if key == "variacao_peso_pct":
+                    try:
+                        val = float(val) / 100.0
+                    except: pass
+
                 self.controller.config_manager.data[key] = val
+
             elif isinstance(widget, NoWheelComboBox):
                 self.controller.config_manager.data[key] = widget.currentText()
+        
         for key, var_list in self.checkbox_groups.items():
             selected = [opt for opt, chk in var_list if chk.isChecked()]
             self.controller.config_manager.data[key] = selected
+        
         new_species = []
         for r in self.species_rows:
             try:
@@ -517,14 +559,23 @@ class MainWindow(QMainWindow):
     def refresh_config_tab(self):
         for key, widget in self.config_widgets.items():
             val = self.controller.config_manager.data.get(key, "")
+            
+            # Ajuste de exibição da porcentagem (Float 0.xx -> Inteiro)
+            if key == "variacao_peso_pct":
+                try:
+                    val = int(float(val) * 100)
+                except: pass
+
             if isinstance(widget, QLineEdit):
                 widget.setText(str(val))
             elif isinstance(widget, NoWheelComboBox):
                 widget.setCurrentText(str(val))
+        
         for key, var_list in self.checkbox_groups.items():
             saved_vals = self.controller.config_manager.data.get(key, [])
             for opt, chk in var_list:
                 chk.setChecked(opt in saved_vals)
+        
         self.reload_species_widgets()
         mun = self.controller.config_manager.data.get("municipio_padrao")
         self.combo_mun.setCurrentText(mun)

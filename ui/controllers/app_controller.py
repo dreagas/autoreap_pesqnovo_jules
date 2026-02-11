@@ -165,7 +165,7 @@ class AppController(QObject):
                 if not linhas:
                     self.logger.warning("Tabela não encontrada após 10 tentativas.")
                     self.status_signal.emit("● Erro", "#EF4444")
-                    self.search_error.emit("Tabela não encontrada.")
+                    self.search_error.emit("Erro na varredura, tente usar o botão de atualizar lista na aba à esquerda.")
                     return
 
                 self.status_signal.emit("● Conectado", "#10B981")
