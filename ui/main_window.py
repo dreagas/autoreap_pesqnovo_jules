@@ -1,16 +1,16 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTabWidget, QScrollArea, QFrame, QLineEdit, QTextEdit, QMessageBox,
-    QGridLayout, QGroupBox, QCheckBox, QApplication
+    QGridLayout, QGroupBox, QCheckBox, QApplication, QSizePolicy, QSpacerItem
 )
 from PySide6.QtCore import Qt, Slot, QSize, QTimer
 from PySide6.QtGui import QIcon, QAction
 
 from ui.controllers.app_controller import AppController
-from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox
+from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
 from ui.dialogs.month_selector import MonthSelectorDialog
 from ui.dialogs.simulation_dialog import SimulationDialog
-from core.constants import VERSION, LOG_FILE
+from core.constants import VERSION, LOG_FILE, IMG_DIR
 
 import os
 
@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Automação REAP v{VERSION}")
-        self.resize(1100, 750)
+        self.resize(1100, 750) 
 
         # Controller
         self.controller = AppController()
@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(self.tabs)
 
-        # Start connection logic automatically after show?
+        # Start connection logic automatically
         QTimer.singleShot(500, self.controller.start_browser)
 
     def connect_signals(self):
@@ -53,11 +53,13 @@ class MainWindow(QMainWindow):
         self.controller.search_error.connect(self.on_search_error)
         self.controller.year_finished.connect(self.on_year_finished)
         self.controller.execution_error.connect(self.on_execution_error)
+        self.controller.request_login.connect(self.show_login_popup)
+        self.controller.show_success_popup.connect(self.show_success_message)
 
     def create_sidebar(self):
         sidebar = QFrame()
-        sidebar.setStyleSheet("background-color: #1E293B; border-right: 1px solid #335c81;")
-        sidebar.setFixedWidth(240)
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(280)
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(20, 30, 20, 20)
@@ -65,42 +67,68 @@ class MainWindow(QMainWindow):
 
         # Title
         title = QLabel("REAP AUTO")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #60A5FA; border: none;")
+        title.setStyleSheet("font-family: 'Roboto'; font-size: 32px; font-weight: 900; color: #38BDF8; border: none; background: transparent;")
         layout.addWidget(title)
 
-        ver = QLabel(f"{VERSION}")
-        ver.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
+        ver = QLabel(f"Versão {VERSION}")
+        ver.setStyleSheet("color: #64748B; font-size: 13px; border: none; background: transparent; font-weight: bold;")
         layout.addWidget(ver)
 
         # Status
         self.lbl_status = QLabel("Status: Iniciando...")
-        self.lbl_status.setStyleSheet("font-weight: bold; color: #38BDF8; border: none;")
+        self.lbl_status.setStyleSheet("font-weight: bold; color: #E2E8F0; border: none; margin-bottom: 10px; background: transparent; font-size: 14px;")
         layout.addWidget(self.lbl_status)
 
-        # Buttons
-        self.btn_reconnect = QPushButton("RECONECTAR CHROME")
+        # Buttons Helper
+        def create_btn(text, icon_name=None, color_style=None):
+            btn = QPushButton(text)
+            if icon_name:
+                icon_path = os.path.join(IMG_DIR, icon_name)
+                if os.path.exists(icon_path):
+                    btn.setIcon(QIcon(icon_path))
+                    btn.setIconSize(QSize(28, 28))
+            
+            # Removido padding-left e text-align: left para centralizar
+            # Estilo base agora confia no QSS global que tem text-align: center
+            if color_style:
+                btn.setStyleSheet(color_style)
+                
+            return btn
+
+        # Sidebar Buttons
+        self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png")
+        self.btn_reconnect.setObjectName("BoldButton") 
+        self.btn_reconnect.setStyleSheet("font-weight: bold;")
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
 
-        self.btn_open_tabs = QPushButton("ABRIR ABAS DE TRABALHO")
+        self.btn_open_tabs = create_btn(" ABRIR ABAS", "img_abas.png")
+        self.btn_open_tabs.setStyleSheet("font-weight: bold;")
         self.btn_open_tabs.clicked.connect(self.controller.open_tabs)
         layout.addWidget(self.btn_open_tabs)
 
-        self.btn_search = QPushButton("ATUALIZAR LISTA")
+        self.btn_search = create_btn(" ATUALIZAR LISTA", "img_atualizar.png")
+        self.btn_search.setStyleSheet("font-weight: bold;")
         self.btn_search.clicked.connect(lambda: self.controller.run_search(force_new=True))
         self.btn_search.setEnabled(False)
-        self.btn_search.setStyleSheet("QPushButton { background-color: #0891B2; } QPushButton:disabled { background-color: #334155; }")
         layout.addWidget(self.btn_search)
 
-        self.btn_logs = QPushButton("VER LOGS")
+        self.btn_logs = create_btn(" VER LOGS COMPLETO", "img_log.png")
+        self.btn_logs.setStyleSheet("font-weight: bold;")
         self.btn_logs.clicked.connect(self.open_logs)
         layout.addWidget(self.btn_logs)
 
         layout.addStretch()
 
-        self.btn_stop = QPushButton("PARAR TUDO")
+        # PARAR TUDO
+        self.btn_stop = create_btn(" PARAR TUDO", "img_parar.png")
+        self.btn_stop.setObjectName("BoldButton")
         self.btn_stop.clicked.connect(self.controller.stop_automation)
-        self.btn_stop.setStyleSheet("background-color: #EF4444;")
+        self.btn_stop.setStyleSheet("""
+            QPushButton { background-color: #EF4444; } 
+            QPushButton:hover { background-color: #DC2626; }
+            QPushButton:disabled { background-color: #1E293B; color: #475569; }
+        """)
         self.btn_stop.setEnabled(False)
         layout.addWidget(self.btn_stop)
 
@@ -108,22 +136,29 @@ class MainWindow(QMainWindow):
 
     def setup_main_tab(self):
         tab = QWidget()
-        self.tabs.addTab(tab, "Painel Principal")
+        self.tabs.addTab(tab, "PAINEL DE OPERAÇÃO")
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(25)
 
         # Municipality Frame
         frame_mun = QFrame()
         frame_mun.setObjectName("Card")
         mun_layout = QVBoxLayout(frame_mun)
+        mun_layout.setContentsMargins(25, 25, 25, 25)
 
-        mun_layout.addWidget(QLabel("MUNICÍPIO DE OPERAÇÃO", styleSheet="color: #2563EB; font-weight: bold;"))
+        mun_header = QLabel("MUNICÍPIO DE OPERAÇÃO")
+        mun_header.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 16px; background: transparent;")
+        mun_layout.addWidget(mun_header)
+        
+        lbl_hint = QLabel("(Clique na seta abaixo para alterar)")
+        lbl_hint.setStyleSheet("color: #64748B; font-size: 12px; margin-bottom: 5px;")
+        mun_layout.addWidget(lbl_hint)
 
         self.combo_mun = NoWheelComboBox()
         self.combo_mun.addItems(["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"])
         self.combo_mun.currentTextChanged.connect(self.on_municipio_change)
 
-        # Load initial value
         current_mun = self.controller.config_manager.data.get("municipio_padrao")
         self.combo_mun.setCurrentText(current_mun)
 
@@ -135,8 +170,16 @@ class MainWindow(QMainWindow):
         self.entry_mun_manual.setText(self.controller.config_manager.data.get("municipio_manual", ""))
         mun_layout.addWidget(self.entry_mun_manual)
 
-        btn_save_mun = QPushButton("Salvar Preferência")
+        # SALVAR PREFERÊNCIA
+        btn_save_mun = QPushButton(" SALVAR PREFERÊNCIA")
+        btn_save_mun.setObjectName("BoldButton")
+        icon_path = os.path.join(IMG_DIR, "img_salvar.png")
+        if os.path.exists(icon_path):
+            btn_save_mun.setIcon(QIcon(icon_path))
+            btn_save_mun.setIconSize(QSize(24, 24))
+        
         btn_save_mun.clicked.connect(self.save_municipio_pref)
+        btn_save_mun.setStyleSheet("min-height: 40px;")
         mun_layout.addWidget(btn_save_mun)
 
         layout.addWidget(frame_mun)
@@ -145,75 +188,114 @@ class MainWindow(QMainWindow):
         frame_actions = QFrame()
         frame_actions.setObjectName("Card")
         act_layout = QVBoxLayout(frame_actions)
-        act_layout.addWidget(QLabel("CONTROLE DE PREENCHIMENTO", styleSheet="color: #2563EB; font-weight: bold;"))
+        act_layout.setContentsMargins(25, 25, 25, 25)
+        
+        act_header = QLabel("CONTROLE DE PREENCHIMENTO")
+        act_header.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 16px; background: transparent;")
+        act_layout.addWidget(act_header)
 
         btn_layout = QHBoxLayout()
+        
+        # SELECIONAR MESES
         btn_months = QPushButton("SELECIONAR MESES")
+        btn_months.setObjectName("BoldButton")
         btn_months.clicked.connect(self.open_month_selector)
+        btn_months.setStyleSheet("min-height: 40px;")
+        
+        # SIMULAR VALORES
         btn_sim = QPushButton("SIMULAR VALORES")
+        btn_sim.setObjectName("BoldButton")
         btn_sim.clicked.connect(self.open_simulation)
+        btn_sim.setStyleSheet("min-height: 40px;")
 
         btn_layout.addWidget(btn_months)
         btn_layout.addWidget(btn_sim)
         act_layout.addLayout(btn_layout)
 
-        act_layout.addWidget(QLabel("Valor alvo: R$ 990 a R$ 1100 (Novembro fixo em R$ 1000)", styleSheet="color: gray; font-size: 10px;"))
+        act_layout.addWidget(QLabel("Valor alvo: R$ 990 a R$ 1100 (Novembro fixo em R$ 1000)", styleSheet="color: #94A3B8; font-size: 12px; margin-top: 5px; background: transparent;"))
 
         layout.addWidget(frame_actions)
 
         # Status Header
         status_header = QHBoxLayout()
-        status_header.addWidget(QLabel("PAINEL DE VARREDURA", styleSheet="color: gray; font-weight: bold;"))
+        status_header.addWidget(QLabel("LISTA DE PENDÊNCIAS", styleSheet="color: #E2E8F0; font-weight: 900; font-size: 15px; background: transparent;"))
         self.lbl_small_connected = QLabel("● Aguardando")
-        self.lbl_small_connected.setStyleSheet("color: gray; font-weight: bold;")
+        self.lbl_small_connected.setStyleSheet("color: #64748B; font-weight: bold; background: transparent;")
         status_header.addStretch()
         status_header.addWidget(self.lbl_small_connected)
         layout.addLayout(status_header)
 
-        # Dynamic List (Scroll Area)
+        # Dynamic List
         list_scroll = QScrollArea()
         list_scroll.setWidgetResizable(True)
-        list_scroll.setStyleSheet("QScrollArea { border: 1px solid #335c81; border-radius: 6px; background-color: #1E293B; }")
-
+        
         self.dynamic_list_container = QWidget()
-        self.dynamic_list_container.setStyleSheet("background-color: #1E293B;")
         self.dynamic_list_layout = QVBoxLayout(self.dynamic_list_container)
+        self.dynamic_list_layout.setSpacing(10)
         list_scroll.setWidget(self.dynamic_list_container)
 
         self.update_list_msg("Aguardando Login...")
 
         layout.addWidget(list_scroll)
 
-        # Mini Log Box
+        # Log
         self.mini_log = QTextEdit()
+        self.mini_log.setObjectName("LogBox")
         self.mini_log.setReadOnly(True)
-        self.mini_log.setFixedHeight(80)
-        self.mini_log.setStyleSheet("font-family: Consolas; font-size: 10px; background-color: black; color: #A1A1AA;")
+        self.mini_log.setFixedHeight(120)
         layout.addWidget(self.mini_log)
 
     def setup_config_tab(self):
         tab = QWidget()
-        self.tabs.addTab(tab, "Configurações")
-        layout = QVBoxLayout(tab)
+        self.tabs.addTab(tab, "CONFIGURAÇÕES")
+        
+        main_tab_layout = QVBoxLayout(tab)
+        main_tab_layout.setContentsMargins(20, 20, 20, 20)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         self.cfg_layout = QVBoxLayout(content)
+        self.cfg_layout.setContentsMargins(0, 0, 0, 0)
+        self.cfg_layout.setSpacing(25)
 
         self.config_widgets = {}
         self.checkbox_groups = {}
         self.species_rows = []
 
-        # Helper functions
-        def add_header(text):
-            self.cfg_layout.addWidget(QLabel(text, styleSheet="color: #2563EB; font-weight: bold; margin-top: 10px; font-size: 16px;"))
+        # --- Helper Sections ---
+        def create_section_container(title):
+            frame = QFrame()
+            frame.setObjectName("ConfigSection")
+            
+            f_layout = QVBoxLayout(frame)
+            f_layout.setContentsMargins(25, 25, 25, 25)
+            f_layout.setSpacing(15)
 
-        def add_field(label, key, kind="entry", options=None):
-            row = QWidget()
-            h_layout = QHBoxLayout(row)
-            h_layout.setContentsMargins(0,0,0,0)
-            h_layout.addWidget(QLabel(label, styleSheet="font-weight: bold; width: 150px;"))
+            header_layout = QVBoxLayout()
+            header_lbl = QLabel(title)
+            header_lbl.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 16px; background: transparent;")
+            header_layout.addWidget(header_lbl)
+            
+            divider = QFrame()
+            divider.setFrameShape(QFrame.HLine)
+            divider.setFrameShadow(QFrame.Sunken)
+            divider.setStyleSheet("background-color: #334155; max-height: 1px;")
+            header_layout.addWidget(divider)
+            f_layout.addLayout(header_layout)
+            
+            grid = QGridLayout()
+            grid.setSpacing(15)
+            grid.setColumnStretch(1, 1)
+            f_layout.addLayout(grid)
+            
+            return frame, f_layout, grid
+
+        # --- Helper Fields ---
+        def add_field(grid_layout, row_idx, label, key, kind="entry", options=None):
+            lbl = QLabel(label)
+            lbl.setStyleSheet("font-weight: bold; color: #E2E8F0; background: transparent;")
+            grid_layout.addWidget(lbl, row_idx, 0)
 
             val_init = self.controller.config_manager.data.get(key, "")
             widget = None
@@ -225,13 +307,14 @@ class MainWindow(QMainWindow):
                 widget.addItems(options or [])
                 widget.setCurrentText(str(val_init))
 
-            h_layout.addWidget(widget)
+            grid_layout.addWidget(widget, row_idx, 1)
             self.config_widgets[key] = widget
-            self.cfg_layout.addWidget(row)
+            return row_idx + 1
 
-        def add_checkbox_group(label, key, options):
+        def add_checkbox_group(parent_layout, label, key, options):
             group = QGroupBox(label)
             g_layout = QGridLayout(group)
+            g_layout.setSpacing(15)
 
             current_values = self.controller.config_manager.data.get(key, [])
             vars_list = []
@@ -244,63 +327,109 @@ class MainWindow(QMainWindow):
                 vars_list.append((opt, chk))
 
             self.checkbox_groups[key] = vars_list
-            self.cfg_layout.addWidget(group)
+            parent_layout.addWidget(group)
 
-        # Build Config UI
-        add_header("DADOS PESSOAIS / BÁSICOS")
-        add_field("UF Residência:", "uf_residencia", "option", ["MARANHAO", "PARA", "PIAUI"])
-        add_field("Categoria:", "categoria", "option", ["Artesanal", "Industrial"])
-        add_field("Forma Atuação:", "forma_atuacao", "option", ["Desembarcado", "Embarcado"])
+        # 1. Seção: DADOS PESSOAIS
+        s1_frame, s1_layout, s1_grid = create_section_container("DADOS PESSOAIS / BÁSICOS")
+        r = 0
+        estados_br = [
+            "ACRE", "ALAGOAS", "AMAPA", "AMAZONAS", "BAHIA", "CEARA", "DISTRITO FEDERAL", 
+            "ESPIRITO SANTO", "GOIAS", "MARANHAO", "MATO GROSSO", "MATO GROSSO DO SUL", 
+            "MINAS GERAIS", "PARA", "PARAIBA", "PARANA", "PERNAMBUCO", "PIAUI", 
+            "RIO DE JANEIRO", "RIO GRANDE DO NORTE", "RIO GRANDE DO SUL", "RONDONIA", 
+            "RORAIMA", "SANTA CATARINA", "SAO PAULO", "SERGIPE", "TOCANTINS"
+        ]
+        r = add_field(s1_grid, r, "UF Residência:", "uf_residencia", "option", estados_br)
+        r = add_field(s1_grid, r, "Categoria:", "categoria", "option", ["Artesanal", "Industrial"])
+        r = add_field(s1_grid, r, "Forma Atuação:", "forma_atuacao", "option", ["Desembarcado", "Embarcado"])
+        self.cfg_layout.addWidget(s1_frame)
 
-        add_header("ATIVIDADE - DETALHES")
-        add_field("Relação Trabalho:", "relacao_trabalho", "option", ["Individual/Autônomo", "Economia Familiar", "Regime de Parceria", "Carteira de Trabalho", "Contrato de Trabalho"])
-        add_field("Est. Comercialização:", "estado_comercializacao", "option", ["MARANHAO", "PARA"])
-        add_checkbox_group("Grupos Alvo:", "grupos_alvo", ["Algas", "Moluscos", "Mariscos", "Peixes", "Quelônios (Tartarugas de água doce)", "Répteis (jacarés e outros)", "Crustáceos (camarão, lagosta, caranguejo, entre outros)"])
-        add_checkbox_group("Compradores:", "compradores", ["Associação", "Colônia", "Comércio de pescados (feira, mercado)", "Cooperativa", "Intermediário/atrevessador", "Venda direta ao consumidor", "Supermercado", "Outros"])
+        # 2. Seção: ATIVIDADE
+        s2_frame, s2_layout, s2_grid = create_section_container("ATIVIDADE - DETALHES")
+        r = 0
+        r = add_field(s2_grid, r, "Relação Trabalho:", "relacao_trabalho", "option", ["Individual/Autônomo", "Economia Familiar", "Regime de Parceria", "Carteira de Trabalho", "Contrato de Trabalho"])
+        r = add_field(s2_grid, r, "Est. Comercialização:", "estado_comercializacao", "option", estados_br)
+        add_checkbox_group(s2_layout, "Grupos Alvo:", "grupos_alvo", ["Algas", "Moluscos", "Mariscos", "Peixes", "Quelônios (Tartarugas de água doce)", "Répteis (jacarés e outros)", "Crustáceos (camarão, lagosta, caranguejo, entre outros)"])
+        add_checkbox_group(s2_layout, "Compradores:", "compradores", ["Associação", "Colônia", "Comércio de pescados (feira, mercado)", "Cooperativa", "Intermediário/atrevessador", "Venda direta ao consumidor", "Supermercado", "Outros"])
+        self.cfg_layout.addWidget(s2_frame)
 
-        add_header("LOCAL E MÉTODOS DE PESCA")
-        add_field("Tipo Local:", "local_pesca_tipo", "option", ["Açude", "Estuário", "Mar", "Lago", "Lagoa", "Rio", "Represa", "Reservatório", "Laguna"])
-        add_field("Nome do Local:", "nome_local_pesca", "entry")
-        add_field("UF Pesca:", "uf_pesca", "option", ["MARANHAO", "PARA"])
-        add_checkbox_group("Métodos / Apetrechos:", "metodos_pesca", ["Arrasto", "Cerco", "Covos", "Emalhe", "Espinhel", "Linha de Mão", "Linha e Anzol", "Mariscagem", "Matapi", "Pesca Subaquática", "Tarrafa", "Vara", "Outro"])
+        # 3. Seção: LOCAL E MÉTODOS
+        s3_frame, s3_layout, s3_grid = create_section_container("LOCAL E MÉTODOS DE PESCA")
+        r = 0
+        r = add_field(s3_grid, r, "Tipo Local:", "local_pesca_tipo", "option", ["Açude", "Estuário", "Mar", "Lago", "Lagoa", "Rio", "Represa", "Reservatório", "Laguna"])
+        r = add_field(s3_grid, r, "Nome do Local:", "nome_local_pesca", "entry")
+        r = add_field(s3_grid, r, "UF Pesca:", "uf_pesca", "option", estados_br)
+        add_checkbox_group(s3_layout, "Métodos / Apetrechos:", "metodos_pesca", ["Arrasto", "Cerco", "Covos", "Emalhe", "Espinhel", "Linha de Mão", "Linha e Anzol", "Mariscagem", "Matapi", "Pesca Subaquática", "Tarrafa", "Vara", "Outro"])
+        self.cfg_layout.addWidget(s3_frame)
 
-        add_header("PRODUÇÃO E VALORES")
-        add_field("Meta Fin. Mín (R$):", "meta_financeira_min", "entry")
-        add_field("Meta Fin. Máx (R$):", "meta_financeira_max", "entry")
-        add_field("Variação Peso (%):", "variacao_peso_pct", "entry")
-        add_field("Dias Trab. Mín:", "dias_min", "entry")
-        add_field("Dias Trab. Máx:", "dias_max", "entry")
+        # 4. Seção: PRODUÇÃO
+        s4_frame, s4_layout, s4_grid = create_section_container("PRODUÇÃO E VALORES")
+        r = 0
+        r = add_field(s4_grid, r, "Meta Fin. Mín (R$):", "meta_financeira_min", "entry")
+        r = add_field(s4_grid, r, "Meta Fin. Máx (R$):", "meta_financeira_max", "entry")
+        r = add_field(s4_grid, r, "Variação Peso (%):", "variacao_peso_pct", "entry")
+        r = add_field(s4_grid, r, "Dias Trab. Mín:", "dias_min", "entry")
+        r = add_field(s4_grid, r, "Dias Trab. Máx:", "dias_max", "entry")
+        self.cfg_layout.addWidget(s4_frame)
 
-        add_header("CATÁLOGO DE ESPÉCIES")
-
+        # 5. Seção: ESPÉCIES
+        s5_frame, s5_layout, _ = create_section_container("CATÁLOGO DE ESPÉCIES")
         self.species_container = QWidget()
         self.species_layout = QVBoxLayout(self.species_container)
-        self.cfg_layout.addWidget(self.species_container)
+        self.species_layout.setContentsMargins(0,0,0,0)
+        s5_layout.addWidget(self.species_container)
 
         self.reload_species_widgets()
 
-        btn_add_sp = QPushButton("+ ADICIONAR NOVA ESPÉCIE")
-        btn_add_sp.setStyleSheet("background-color: #0D9488;")
+        # Botão Adicionar - Icone img_adicionar.png
+        btn_add_sp = QPushButton(" ADICIONAR NOVA ESPÉCIE")
+        icon_path = os.path.join(IMG_DIR, "img_adicionar.png")
+        if os.path.exists(icon_path):
+            btn_add_sp.setIcon(QIcon(icon_path))
+            btn_add_sp.setIconSize(QSize(20, 20))
+        
+        btn_add_sp.setStyleSheet("""
+            QPushButton { background-color: #0D9488; font-weight: normal; }
+            QPushButton:hover { background-color: #0F766E; }
+        """)
         btn_add_sp.clicked.connect(self.add_species_row_interactive)
-        self.cfg_layout.addWidget(btn_add_sp)
+        s5_layout.addWidget(btn_add_sp)
+        self.cfg_layout.addWidget(s5_frame)
 
         self.cfg_layout.addSpacing(20)
 
-        btn_save_all = QPushButton("SALVAR TODAS AS CONFIGURAÇÕES")
-        btn_save_all.setStyleSheet("background-color: #0891B2; font-size: 14px; padding: 10px;")
+        # SALVAR TODAS - Icone img_salvar.png
+        btn_save_all = QPushButton(" SALVAR TODAS AS CONFIGURAÇÕES")
+        icon_path = os.path.join(IMG_DIR, "img_salvar.png")
+        if os.path.exists(icon_path):
+            btn_save_all.setIcon(QIcon(icon_path))
+            btn_save_all.setIconSize(QSize(24, 24))
+
+        btn_save_all.setStyleSheet("""
+            QPushButton { background-color: #0284C7; padding: 15px; font-size: 14px; font-weight: normal; }
+            QPushButton:hover { background-color: #0369A1; }
+        """)
         btn_save_all.clicked.connect(self.save_full_config)
         self.cfg_layout.addWidget(btn_save_all)
 
-        btn_reset = QPushButton("RESTAURAR PADRÕES ORIGINAIS")
-        btn_reset.setStyleSheet("background-color: #1E40AF;")
+        # RESTAURAR PADRÕES - Icone img_restaurar.png
+        btn_reset = QPushButton(" RESTAURAR PADRÕES ORIGINAIS")
+        icon_path = os.path.join(IMG_DIR, "img_restaurar.png")
+        if os.path.exists(icon_path):
+            btn_reset.setIcon(QIcon(icon_path))
+            btn_reset.setIconSize(QSize(24, 24))
+
+        btn_reset.setStyleSheet("""
+            QPushButton { background-color: #1E40AF; font-weight: normal; }
+            QPushButton:hover { background-color: #1E3A8A; }
+        """)
         btn_reset.clicked.connect(self.reset_config)
         self.cfg_layout.addWidget(btn_reset)
 
         scroll.setWidget(content)
-        layout.addWidget(scroll)
+        main_tab_layout.addWidget(scroll)
 
     def reload_species_widgets(self):
-        # Clear
         while self.species_layout.count():
             child = self.species_layout.takeAt(0)
             if child.widget():
@@ -330,9 +459,20 @@ class MainWindow(QMainWindow):
         kg.setPlaceholderText("Kg Base")
         row_layout.addWidget(kg, stretch=1)
 
-        btn_del = QPushButton("X")
-        btn_del.setStyleSheet("background-color: #EF4444; width: 30px;")
-        btn_del.setFixedWidth(30)
+        # Remover Especie - Icone img_remover.png
+        btn_del = QPushButton()
+        icon_path = os.path.join(IMG_DIR, "img_remover.png")
+        if os.path.exists(icon_path):
+            btn_del.setIcon(QIcon(icon_path))
+            btn_del.setIconSize(QSize(20, 20))
+        else:
+            btn_del.setText("X") # Fallback se não tiver imagem
+
+        btn_del.setStyleSheet("""
+            QPushButton { background-color: #EF4444; width: 40px; padding: 0px; min-height: 40px; border-radius: 6px; }
+            QPushButton:hover { background-color: #B91C1C; }
+        """)
+        btn_del.setFixedWidth(40)
         btn_del.clicked.connect(lambda: self.remove_species_row(row_widget))
         row_layout.addWidget(btn_del)
 
@@ -355,14 +495,12 @@ class MainWindow(QMainWindow):
         self.controller.config_manager.data["municipio_padrao"] = val
         self.controller.config_manager.data["municipio_manual"] = manual
         self.controller.config_manager.save()
-        QMessageBox.information(self, "Sucesso", "Município salvo.")
+        ModernMessageBox("SUCESSO", "Preferência de município salva!", "SUCCESS", self).exec()
 
     def save_full_config(self):
-        # Fields
         for key, widget in self.config_widgets.items():
             if isinstance(widget, QLineEdit):
                 val = widget.text()
-                # conversion logic
                 if key in ["dias_min", "dias_max", "meta_financeira_min", "meta_financeira_max", "variacao_peso_pct"]:
                     try: val = float(val) if '.' in val else int(val)
                     except: pass
@@ -370,12 +508,10 @@ class MainWindow(QMainWindow):
             elif isinstance(widget, NoWheelComboBox):
                 self.controller.config_manager.data[key] = widget.currentText()
 
-        # Checkboxes
         for key, var_list in self.checkbox_groups.items():
             selected = [opt for opt, chk in var_list if chk.isChecked()]
             self.controller.config_manager.data[key] = selected
 
-        # Species
         new_species = []
         for r in self.species_rows:
             try:
@@ -388,16 +524,16 @@ class MainWindow(QMainWindow):
         self.controller.config_manager.data["catalogo_especies"] = new_species
 
         self.controller.config_manager.save()
-        QMessageBox.information(self, "Sucesso", "Configurações salvas!")
+        ModernMessageBox("SUCESSO", "Todas as configurações foram salvas!", "SUCCESS", self).exec()
 
     def reset_config(self):
-        ret = QMessageBox.question(self, "Restaurar Padrão", "Tem certeza? Isso apagará todas as personalizações.")
-        if ret == QMessageBox.StandardButton.Yes:
+        dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações e restaurará os valores padrão.", "WARNING", self)
+        dlg.btn_ok.setText("SIM, RESTAURAR")
+        if dlg.exec():
             self.controller.config_manager.reset_to_defaults()
             self.refresh_config_tab()
 
     def refresh_config_tab(self):
-        # Update widgets with new data
         for key, widget in self.config_widgets.items():
             val = self.controller.config_manager.data.get(key, "")
             if isinstance(widget, QLineEdit):
@@ -412,7 +548,6 @@ class MainWindow(QMainWindow):
 
         self.reload_species_widgets()
 
-        # Also Mun
         mun = self.controller.config_manager.data.get("municipio_padrao")
         self.combo_mun.setCurrentText(mun)
         self.entry_mun_manual.setText(self.controller.config_manager.data.get("municipio_manual", ""))
@@ -426,37 +561,32 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def open_logs(self):
-        # Open in system editor
         try:
             os.startfile(LOG_FILE)
         except Exception as e:
-            QMessageBox.warning(self, "Erro", f"Não foi possível abrir o log:\n{e}")
+            ModernMessageBox("ERRO", f"Não foi possível abrir o log:\n{e}", "ERROR", self).exec()
 
     @Slot(str, str)
     def append_log(self, msg, tag):
-        # Colorize logic
-        color = "#e0e0e0"
+        color = "#94A3B8"
         if tag == "WARNING": color = "#FACC15"
-        elif tag == "ERROR": color = "#F87171"
-        elif tag == "SUCCESS": color = "#38BDF8"
-        elif tag == "DESTAK": color = "#818CF8"
+        elif tag == "ERROR": color = "#EF4444"
+        elif tag == "SUCCESS": color = "#10B981"
+        elif tag == "DESTAK": color = "#38BDF8"
 
         html = f"<span style='color:{color}'>{msg}</span>"
         self.mini_log.append(html)
 
     @Slot(str, str)
     def update_status(self, msg, color_code):
-        # e.g. "Conectado", "#10B981"
         if msg.startswith("●"):
             self.lbl_small_connected.setText(msg)
-            self.lbl_small_connected.setStyleSheet(f"color: {color_code}; font-weight: bold;")
-            # Also update dynamic list message
+            self.lbl_small_connected.setStyleSheet(f"color: {color_code}; font-weight: bold; background: transparent;")
             self.update_list_msg(msg, color_code)
         else:
             self.lbl_status.setText(f"Status: {msg}")
-            # Map color names to hex if needed, but hex is passed
-            if color_code == "white": self.lbl_status.setStyleSheet("color: white; font-weight: bold;")
-            else: self.lbl_status.setStyleSheet(f"color: {color_code}; font-weight: bold;")
+            if color_code == "white": self.lbl_status.setStyleSheet("color: white; font-weight: bold; background: transparent;")
+            else: self.lbl_status.setStyleSheet(f"color: {color_code}; font-weight: bold; background: transparent;")
 
     @Slot()
     def on_browser_connected(self):
@@ -467,20 +597,33 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def on_search_error(self, msg):
         self.lbl_small_connected.setText("● Erro")
-        self.lbl_small_connected.setStyleSheet("color: #EF4444; font-weight: bold;")
+        self.lbl_small_connected.setStyleSheet("color: #EF4444; font-weight: bold; background: transparent;")
         self.update_list_msg("Erro na varredura.", "#EF4444")
-        QMessageBox.warning(self, "Erro", msg)
+        ModernMessageBox("ERRO DE VARREDURA", msg, "ERROR", self).exec()
 
     @Slot(str)
     def on_execution_error(self, msg):
         if msg == "INTERRUPTED":
-             ret = QMessageBox.question(self, "Parado", "Automação Parada!\nDeseja voltar para a página inicial?")
-             if ret == QMessageBox.StandardButton.Yes:
+             dlg = ModernMessageBox("PARADO", "Automação Parada com Sucesso!\nDeseja voltar a página inicial?", "WARNING", self)
+             dlg.btn_ok.setText("VOLTAR INÍCIO")
+             if dlg.exec():
                  self.controller.force_return_home()
         else:
-             ret = QMessageBox.critical(self, "Erro", f"{msg}\n\nTentar voltar ao início?")
-             if ret == QMessageBox.StandardButton.Yes:
+             dlg = ModernMessageBox("ERRO CRÍTICO", f"{msg}\n\nDeseja tentar voltar ao início?", "ERROR", self)
+             dlg.btn_ok.setText("SIM, VOLTAR")
+             if dlg.exec():
                  self.controller.force_return_home()
+                 
+    @Slot()
+    def show_login_popup(self):
+        dlg = ModernMessageBox("LOGIN NECESSÁRIO", "O Chrome foi aberto.\n\nPor favor, faça o LOGIN no Gov.br.\n\nQuando estiver logado, clique abaixo.", "INFO", self)
+        dlg.btn_ok.setText("JÁ ESTOU LOGADO")
+        dlg.exec()
+        self.controller.confirm_login()
+
+    @Slot(str, str)
+    def show_success_message(self, title, msg):
+        ModernMessageBox(title, msg, "SUCCESS", self).exec()
 
     @Slot(str)
     def on_year_finished(self, year):
@@ -488,7 +631,6 @@ class MainWindow(QMainWindow):
 
     @Slot(list)
     def update_task_list(self, results):
-        # Clear
         while self.dynamic_list_layout.count():
             child = self.dynamic_list_layout.takeAt(0)
             if child.widget():
@@ -504,21 +646,30 @@ class MainWindow(QMainWindow):
             sent = item['sent']
 
             btn = QPushButton()
-            btn.setFixedHeight(40)
+            btn.setFixedHeight(55) 
+            btn.setCursor(Qt.PointingHandCursor)
+            
+            if not sent:
+                icon_path = os.path.join(IMG_DIR, "img_forms.png")
+                if os.path.exists(icon_path):
+                    btn.setIcon(QIcon(icon_path))
+                    btn.setIconSize(QSize(28, 28))
 
             if sent:
                 btn.setText(f"{year} (JÁ ENVIADO)")
                 btn.setEnabled(False)
-                btn.setStyleSheet("background-color: #475569; color: gray; font-weight: bold;")
+                btn.setStyleSheet("background-color: #1E293B; color: #64748B; border: 1px solid #334155;")
             else:
-                btn.setText(f"PROCESSAR {year}")
-                btn.setStyleSheet("background-color: #2563EB; font-weight: bold;")
+                btn.setText(f"  PROCESSAR {year}")
+                btn.setStyleSheet("""
+                    QPushButton { background-color: #0284C7; font-size: 15px; text-align: left; padding-left: 20px; font-weight: 900; }
+                    QPushButton:hover { background-color: #0369A1; }
+                """)
                 btn.clicked.connect(lambda checked=False, i=idx, y=year: self.controller.run_year(i, y))
 
             self.dynamic_list_layout.addWidget(btn)
 
-    def update_list_msg(self, msg, color="gray"):
-        # Clear
+    def update_list_msg(self, msg, color="#94A3B8"):
         while self.dynamic_list_layout.count():
             child = self.dynamic_list_layout.takeAt(0)
             if child.widget():
@@ -527,5 +678,5 @@ class MainWindow(QMainWindow):
         lbl = QLabel(msg)
         lbl.setAlignment(Qt.AlignCenter)
         lbl.setWordWrap(True)
-        lbl.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold; margin-top: 40px;")
+        lbl.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold; margin-top: 60px; background: transparent;")
         self.dynamic_list_layout.addWidget(lbl)

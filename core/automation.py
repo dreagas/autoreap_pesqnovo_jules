@@ -7,7 +7,6 @@ import unicodedata
 import random
 import socket
 import traceback
-import ctypes
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -25,10 +24,6 @@ from core.constants import (
     MESES_DEFESO_PADRAO,
     MESES_PRODUCAO_PADRAO
 )
-
-# ==============================================================================
-#  LÓGICA DO NAVEGADOR (BACKEND)
-# ==============================================================================
 
 class AutomationLogic:
     def __init__(self, logger, stop_event, config_manager):
@@ -117,6 +112,8 @@ class AutomationLogic:
         opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{CHROME_DEBUG_PORT}")
         try:
             self.driver = webdriver.Chrome(options=opts)
+            # Teste de vida
+            _ = self.driver.current_window_handle
             self.logger.info("Conexão Selenium ESTABELECIDA com sucesso!", extra={'tags': 'SUCCESS'})
             return self.driver
         except Exception as e:
@@ -128,12 +125,22 @@ class AutomationLogic:
             self.garantir_chrome_aberto()
 
         driver = self.conectar_selenium()
+        
+        # Check de saúde
+        try:
+            if driver:
+                _ = driver.title # Tenta acessar algo simples
+        except:
+            driver = None
+
         if not driver:
-            self.logger.warning("Primeira tentativa de conexão falhou. Reiniciando Chrome...")
+            self.logger.warning("Conexão falhou ou driver 'zumbi'. Reiniciando Chrome...")
             self.fechar_chrome_brutalmente()
             time.sleep(1)
             self.garantir_chrome_aberto()
             driver = self.conectar_selenium()
+        
+        self.driver = driver
         return driver
 
     def trazer_navegador_frente(self):
@@ -161,15 +168,22 @@ class AutomationLogic:
             for j in janelas:
                 try:
                     driver.switch_to.window(j)
-                    if "pesqbrasil" in driver.current_url:
+                    url_atual = driver.current_url.lower()
+                    titulo_atual = driver.title.lower()
+                    
+                    # Detecção aprimorada
+                    if "pesqbrasil" in url_atual or "manutencao" in url_atual or "pescador profissional" in titulo_atual:
                         aba_encontrada = j
                         break
                 except: continue
 
             if aba_encontrada:
                 driver.switch_to.window(aba_encontrada)
-                self.logger.info("Aba PesqBrasil encontrada. Forçando atualização...", extra={'tags': 'INFO'})
-                driver.get(URL_ALVO)
+                self.logger.info("Aba PesqBrasil encontrada.", extra={'tags': 'INFO'})
+                # Só recarrega se não estiver na página certa (evita reload desnecessário)
+                if URL_ALVO not in driver.current_url:
+                     driver.get(URL_ALVO)
+                
                 try: WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
                 except: time.sleep(1.0)
                 return True
@@ -189,14 +203,53 @@ class AutomationLogic:
         self.garantir_acesso_manutencao()
 
     def restaurar_abas_trabalho(self):
+        """Verifica quais abas já estão abertas e abre apenas as faltantes."""
         if not self.driver: return
-        self.logger.info("Restaurando abas de trabalho...", extra={'tags': 'INFO'})
-        for url in URLS_ABERTURA:
-            try:
-                self.driver.execute_script(f"window.open('{url}', '_blank');")
-                time.sleep(0.1)
-            except: pass
-        self.garantir_acesso_manutencao()
+        self.logger.info("Verificando abas de trabalho...", extra={'tags': 'INFO'})
+        
+        try:
+            janelas = self.driver.window_handles
+            urls_abertas = []
+            
+            # Coleta URLs abertas (pode ser lento se houver muitas abas)
+            for j in janelas:
+                try:
+                    self.driver.switch_to.window(j)
+                    urls_abertas.append(self.driver.current_url.lower())
+                except: pass
+            
+            # Volta para a primeira (só para não ficar perdido)
+            if janelas: self.driver.switch_to.window(janelas[0])
+
+            count_abertas = 0
+            for url_alvo in URLS_ABERTURA:
+                # Simplificação: verifica se parte da URL alvo está em alguma aberta
+                # Ex: "cadunico" em "https://cadunico..."
+                keyword = ""
+                if "cadunico" in url_alvo: keyword = "cadunico"
+                elif "esocial" in url_alvo: keyword = "esocial"
+                elif "receita" in url_alvo: keyword = "receita"
+                elif "pesqbrasil" in url_alvo: keyword = "pesqbrasil"
+                
+                ja_existe = False
+                for u in urls_abertas:
+                    if keyword and keyword in u:
+                        ja_existe = True
+                        break
+                
+                if not ja_existe:
+                    self.logger.info(f"Abrindo aba faltante: {keyword}")
+                    self.driver.execute_script(f"window.open('{url_alvo}', '_blank');")
+                    count_abertas += 1
+                    time.sleep(0.5)
+            
+            if count_abertas == 0:
+                self.logger.info("Todas as abas de trabalho já estão abertas.", extra={'tags': 'SUCCESS'})
+            
+            self.garantir_acesso_manutencao()
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao restaurar abas: {e}")
 
     # --- INTERAÇÃO COM ELEMENTOS ---
 
@@ -582,7 +635,10 @@ class AutomationLogic:
             if not self.driver.execute_script("return arguments[0].checked;", chk):
                 self.click_robusto(chk)
                 self.logger.info("Termo aceito!", extra={'tags': 'SUCCESS'})
-            ctypes.windll.user32.MessageBoxW(0, "O preenchimento automático foi CONCLUÍDO!\nRevise e clique em Enviar.", "Automação REAP", 0x40 | 0x1000)
+            
+            # REMOVIDO: ctypes.windll.user32.MessageBoxW...
+            # A mensagem de sucesso agora é gerenciada pelo AppController -> UI
+            
         except Exception as e:
             self.logger.error(f"Erro Etapa 4: {e}")
 

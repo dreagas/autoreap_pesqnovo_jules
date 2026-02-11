@@ -7,7 +7,6 @@ import threading
 import queue
 import time
 import re
-import ctypes
 from selenium.webdriver.common.by import By
 
 class WorkerThread(QThread):
@@ -31,6 +30,10 @@ class AppController(QObject):
     search_error = Signal(str)
     year_finished = Signal(str) # year
     execution_error = Signal(str)
+    
+    # NOVOS SINAIS PARA POPUPS UI
+    request_login = Signal() # Solicita que a UI mostre o popup de login
+    show_success_popup = Signal(str, str) # Titulo, Mensagem
 
     def __init__(self):
         super().__init__()
@@ -38,6 +41,9 @@ class AppController(QObject):
         self.logger, self.log_queue = setup_logging(LOG_FILE, VERSION)
         self.stop_event = threading.Event()
         self.automation = None
+        
+        # Evento para pausar a thread enquanto o usuario dá OK no login
+        self.login_confirmed_event = threading.Event()
 
         # Timer to poll log queue
         self.log_timer = QTimer()
@@ -58,9 +64,14 @@ class AppController(QObject):
                 self.log_signal.emit(msg, tag)
         except queue.Empty:
             pass
+            
+    def confirm_login(self):
+        """Chamado pela UI quando o usuário clica em OK no popup de login"""
+        self.login_confirmed_event.set()
 
     def start_browser(self):
         self.stop_event.clear()
+        self.login_confirmed_event.clear()
         self.status_signal.emit("Conectando Chrome...", "white")
 
         def boot_task():
@@ -72,8 +83,9 @@ class AppController(QObject):
                 self.execution_error.emit("Falha crítica ao abrir navegador.")
                 return
 
-            # Keep ctypes for behavioral consistency with original code
-            ctypes.windll.user32.MessageBoxW(0, "Chrome aberto.\n\nFAÇA O LOGIN NO GOV.BR.\n\nClique OK quando estiver logado.", "Aguardando Login", 0x40 | 0x1000)
+            # Substituição do ctypes por Sinal UI + Wait
+            self.request_login.emit()
+            self.login_confirmed_event.wait() # A thread para aqui e espera a UI chamar confirm_login()
 
             self.logger.info("Login confirmado. Conectando Selenium...", extra={'tags': 'INFO'})
 
@@ -91,8 +103,27 @@ class AppController(QObject):
         self.current_worker.start()
 
     def stop_automation(self):
+        """Interrompe a automação, scripts e fecha a conexão do Selenium."""
         self.stop_event.set()
-        self.logger.error(">>> PARANDO... <<<", extra={'tags': 'ERROR'})
+        self.logger.error(">>> PARANDO TUDO... <<<", extra={'tags': 'ERROR'})
+        
+        # Forçar parada do Selenium e Scripts
+        if self.automation and self.automation.driver:
+            try:
+                # Tenta parar o carregamento da página via JS
+                self.automation.driver.execute_script("window.stop();")
+            except:
+                pass
+            
+            try:
+                # Encerra a sessão do driver para matar qualquer execução pendente
+                self.automation.driver.quit()
+                self.automation.driver = None
+                self.logger.info("Conexão Selenium encerrada.", extra={'tags': 'WARNING'})
+            except Exception as e:
+                self.logger.error(f"Erro ao fechar driver: {e}")
+
+        self.status_signal.emit("Parado", "#EF4444")
 
     def open_tabs(self):
         if self.automation:
@@ -105,8 +136,15 @@ class AppController(QObject):
         self.status_signal.emit("● Escaneando...", "#FACC15")
 
         def search_task():
-            if not self.automation or not self.automation.driver:
+            if not self.automation:
                 return
+
+            # Se o driver foi fechado (pelo stop), tenta reconectar silenciosamente ou falha
+            if not self.automation.driver:
+                self.logger.info("Reconectando driver para busca...")
+                if not self.automation.obter_driver_robusto():
+                     self.search_error.emit("Falha ao reconectar navegador.")
+                     return
 
             self.logger.info("Iniciando varredura de pendências...", extra={'tags': 'INFO'})
             try:
@@ -187,6 +225,16 @@ class AppController(QObject):
         self.logger.info(f"Iniciando {ano} | Meses: {len(meses_selecionados)} selecionados", extra={'tags': 'DESTAK'})
 
         def run_task():
+            # Verificacao de segurança do driver
+            if not self.automation or not self.automation.driver:
+                 self.logger.info("Driver desconectado. Tentando reconectar...")
+                 if self.automation:
+                     self.automation.obter_driver_robusto()
+                 
+                 if not self.automation or not self.automation.driver:
+                     self.execution_error.emit("Navegador não conectado.")
+                     return
+
             if self.automation:
                 self.automation.trazer_navegador_frente()
 
@@ -212,22 +260,28 @@ class AppController(QObject):
 
                 self.logger.info(f"Fim {ano}.", extra={'tags': 'SUCCESS'})
                 self.year_finished.emit(ano)
+                self.show_success_popup.emit("Sucesso", f"Preenchimento de {ano} CONCLUÍDO!\nRevise e clique em Enviar.")
 
             except InterruptedError:
                 self.logger.warning("Parada Solicitada.")
-                # Logic for popup is handled in UI based on signal or here?
-                # The original code showed popup in the thread.
-                # "show_stop_decision_popup"
-                # I should probably emit a signal for the UI to show the popup.
                 self.execution_error.emit("INTERRUPTED")
 
             except Exception as e:
-                self.logger.error(f"Erro execução: {e}")
-                self.execution_error.emit(str(e))
+                # Se o erro for de sessão inválida (causado pelo Stop matando o driver), tratamos como interrupção
+                if "invalid session id" in str(e).lower() or "no such execution context" in str(e).lower():
+                     self.logger.warning("Sessão encerrada (Stop).")
+                     self.execution_error.emit("INTERRUPTED")
+                else:
+                     self.logger.error(f"Erro execução: {e}")
+                     self.execution_error.emit(str(e))
 
         self.current_worker = WorkerThread(run_task)
         self.current_worker.start()
 
     def force_return_home(self):
         if self.automation:
+             # Se o driver foi morto pelo stop, precisamos reconectar para voltar ao home
+             if not self.automation.driver:
+                 self.automation.obter_driver_robusto()
+             
              threading.Thread(target=self.automation.forcar_retorno_inicio, daemon=True).start()

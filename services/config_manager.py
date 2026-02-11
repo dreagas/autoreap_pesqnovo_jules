@@ -17,7 +17,7 @@ class ConfigManager:
         "local_pesca_tipo": "Rio",
         "uf_pesca": "MARANHAO",
         "nome_local_pesca": "RIO TURI",
-        "metodos_pesca": ["Tarrafa"], # Padrão definido apenas como Tarrafa
+        "metodos_pesca": ["Tarrafa"], # Padrão solicitado: Apenas Tarrafa
 
         # Checkboxes
         "grupos_alvo": ["Peixes"],
