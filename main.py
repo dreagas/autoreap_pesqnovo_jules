@@ -1,8 +1,9 @@
 import sys
 import os
 import ctypes
-from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit
-from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen
+from PySide6.QtGui import QIcon, QPixmap, QColor
+from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
 from core.constants import VERSION, IMG_DIR, resource_path
 from services.license_manager import LicenseManager
@@ -33,7 +34,7 @@ def load_stylesheet(app):
     except Exception as e:
         print(f"Erro ao carregar folha de estilos: {e}")
 
-def check_license_and_updates():
+def check_license_and_updates(splash=None):
     """
     Executa a validação da licença e verifica atualizações.
     Caso a licença falte ou seja inválida, solicita ao utilizador.
@@ -42,9 +43,17 @@ def check_license_and_updates():
     lic_mgr = LicenseManager()
     
     while True:
+        if splash:
+            splash.showMessage(f"Verificando licença...\n\nAutoREAP v{VERSION}", Qt.AlignCenter | Qt.AlignBottom, QColor("#38BDF8"))
+            QApplication.processEvents()
+
         is_valid, msg, remote_data = lic_mgr.validate()
 
         if is_valid:
+            if splash:
+                splash.showMessage(f"Verificando atualizações...\n\nAutoREAP v{VERSION}", Qt.AlignCenter | Qt.AlignBottom, QColor("#38BDF8"))
+                QApplication.processEvents()
+
             # Se a licença for validada online (remote_data presente), verifica updates
             if remote_data:
                 updater = AutoUpdater(VERSION, remote_data)
@@ -67,6 +76,9 @@ def check_license_and_updates():
         temp_app = QApplication.instance() 
         if not temp_app: temp_app = QApplication(sys.argv)
 
+        # Esconde splash para mostrar diálogo
+        if splash: splash.hide()
+
         key, ok = QInputDialog.getText(
             None, 
             "Ativação Necessária", 
@@ -75,6 +87,9 @@ def check_license_and_updates():
             ""
         )
         
+        # Restaura splash se necessário (embora vá loopar e atualizar msg)
+        if splash: splash.show()
+
         if ok and key.strip():
             # Guarda a chave localmente e repete o loop para validar
             lic_mgr.save_local_key(key)
@@ -87,9 +102,27 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("AutoREAPv2")
 
+    # --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
+    splash_pix = QPixmap(450, 300)
+    splash_pix.fill(QColor("#0F172A")) # Fundo Azul Escuro do Tema
+    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+
+    # Configura fonte da splash
+    font = splash.font()
+    font.setPixelSize(14)
+    font.setBold(True)
+    splash.setFont(font)
+
+    splash.showMessage(f"INICIANDO SISTEMA...\nCarregando módulos.\n\nAutoREAP v{VERSION}", Qt.AlignCenter | Qt.AlignBottom, QColor("#38BDF8"))
+    splash.show()
+    app.processEvents()
+    # --------------------------------------------
+
     # 2. Verificação de Acesso e Atualizações
     # Bloqueia a abertura se não houver licença válida
-    success, license_data = check_license_and_updates()
+    # Passamos o splash para que ele possa atualizar o status
+    success, license_data = check_license_and_updates(splash)
+
     if not success:
         sys.exit()
 
@@ -103,9 +136,17 @@ def main():
     load_stylesheet(app)
 
     # 4. Inicialização da Interface Principal
+    if splash:
+        splash.showMessage(f"ABRINDO INTERFACE...\n\nAutoREAP v{VERSION}", Qt.AlignCenter | Qt.AlignBottom, QColor("#38BDF8"))
+        app.processEvents()
+
     # Passamos os dados da licença para configurar municípios personalizados
     window = MainWindow(license_data)
     window.show()
+
+    # Fecha o splash quando a janela principal abrir
+    if splash:
+        splash.finish(window)
 
     # Execução do loop principal
     sys.exit(app.exec())
