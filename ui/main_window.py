@@ -10,18 +10,29 @@ from ui.controllers.app_controller import AppController
 from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
 from ui.dialogs.month_selector import MonthSelectorDialog
 from ui.dialogs.simulation_dialog import SimulationDialog
+from services.license_manager import LicenseManager
 from core.constants import VERSION, LOG_FILE, IMG_DIR
 
 import os
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, license_data=None):
         super().__init__()
         self.setWindowTitle(f"AutoREAPv2 - v{VERSION}")
         self.resize(1100, 750) 
+        
+        # Guarda os dados da licença recebidos no boot
+        self.license_data = license_data or {}
 
         # Controller
         self.controller = AppController()
+        
+        # --- INJEÇÃO AUTOMÁTICA (BOOT) ---
+        # Se a licença tiver um perfil personalizado, aplica agora antes de criar a UI
+        if self.license_data:
+            self.controller.config_manager.apply_cloud_overrides(self.license_data)
+        # ---------------------------------
+
         self.connect_signals()
 
         # Central Widget
@@ -97,9 +108,7 @@ class MainWindow(QMainWindow):
                 
             return btn
 
-        # Sidebar Buttons - Todos com estilo Bold/Roboto (usando BoldButton do QSS ou style direto se necessário)
-        # BoldButton já define font-weight: 900 e Roboto via QSS global
-        
+        # Sidebar Buttons
         self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png", obj_name="BoldButton")
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
@@ -119,11 +128,10 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # PARAR TUDO (Borda Vermelha Forçada e Estilo Vermelho)
+        # PARAR TUDO
         self.btn_stop = create_btn(" PARAR TUDO", "img_parar.png", obj_name="StopButton")
         self.btn_stop.clicked.connect(self.on_stop_clicked)
         self.btn_stop.setEnabled(False)
-        # Forçando estilo vermelho via stylesheet direto para garantir
         self.btn_stop.setStyleSheet("""
             QPushButton { 
                 background-color: #EF4444; 
@@ -173,7 +181,7 @@ class MainWindow(QMainWindow):
         list_scroll.setFixedHeight(220)
         
         self.dynamic_list_container = QWidget()
-        self.dynamic_list_container.setAttribute(Qt.WA_StyledBackground, True) # Garante fundo azul
+        self.dynamic_list_container.setAttribute(Qt.WA_StyledBackground, True)
         self.dynamic_list_layout = QVBoxLayout(self.dynamic_list_container)
         self.dynamic_list_layout.setContentsMargins(0, 0, 5, 0)
         self.dynamic_list_layout.setSpacing(10)
@@ -195,17 +203,29 @@ class MainWindow(QMainWindow):
         mun_header.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 14px; background: transparent;")
         mun_layout.addWidget(mun_header)
         
-        # Correção do fundo escuro: background transparent
         lbl_hint = QLabel("(Clique na seta abaixo para alterar)")
         lbl_hint.setStyleSheet("color: #64748B; font-size: 11px; margin-bottom: 2px; background: transparent;")
         mun_layout.addWidget(lbl_hint)
 
         self.combo_mun = NoWheelComboBox()
-        self.combo_mun.addItems(["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"])
+        
+        # Carrega lista inicial
+        lista_municipios = ["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"]
+        if self.license_data and "perfil_config" in self.license_data:
+            custom = self.license_data["perfil_config"].get("municipios_custom")
+            if isinstance(custom, list) and len(custom) > 0:
+                lista_municipios = custom
+                if "Outros" not in lista_municipios:
+                    lista_municipios.append("Outros")
+
+        self.combo_mun.addItems(lista_municipios)
         self.combo_mun.currentTextChanged.connect(self.on_municipio_change)
 
         current_mun = self.controller.config_manager.data.get("municipio_padrao")
-        self.combo_mun.setCurrentText(current_mun)
+        if current_mun not in lista_municipios and current_mun != "Outros":
+             self.combo_mun.setCurrentIndex(0)
+        else:
+             self.combo_mun.setCurrentText(current_mun)
 
         mun_layout.addWidget(self.combo_mun)
 
@@ -274,7 +294,7 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
-        content.setAttribute(Qt.WA_StyledBackground, True) # CORREÇÃO CRÍTICA: Garante que o CSS pinte o fundo
+        content.setAttribute(Qt.WA_StyledBackground, True)
         self.cfg_layout = QVBoxLayout(content)
         self.cfg_layout.setContentsMargins(0, 0, 0, 0)
         self.cfg_layout.setSpacing(25)
@@ -283,9 +303,34 @@ class MainWindow(QMainWindow):
         self.checkbox_groups = {}
         self.species_rows = []
 
+        # --- BOTÃO DE SINCRONIZAÇÃO NUVEM ---
+        cloud_frame = QFrame()
+        cloud_frame.setObjectName("Card")
+        cloud_layout = QHBoxLayout(cloud_frame)
+        cloud_layout.setContentsMargins(15, 15, 15, 15)
+        
+        self.btn_cloud_sync = QPushButton(" BAIXAR MINHAS CONFIGURAÇÕES DA MINHA LICENÇA DA NUVEM")
+        self.btn_cloud_sync.setObjectName("BoldButton")
+        # Ícone de Nuvem (img_nuvem.png)
+        icon_path = os.path.join(IMG_DIR, "img_nuvem.png")
+        if os.path.exists(icon_path):
+            self.btn_cloud_sync.setIcon(QIcon(icon_path))
+            self.btn_cloud_sync.setIconSize(QSize(24, 24))
+        
+        # Estilo Roxo para diferenciar
+        self.btn_cloud_sync.setStyleSheet("""
+            QPushButton { background-color: #7C3AED; border: 1px solid #6D28D9; font-size: 13px; color: white; font-weight: bold; border-radius: 8px; min-height: 40px; }
+            QPushButton:hover { background-color: #6D28D9; }
+        """)
+        self.btn_cloud_sync.clicked.connect(self.download_cloud_config)
+        cloud_layout.addWidget(self.btn_cloud_sync)
+        
+        self.cfg_layout.addWidget(cloud_frame)
+        # ------------------------------------
+
         def create_section_container(title):
             frame = QFrame()
-            frame.setObjectName("ConfigSection") # CSS: #1E293B
+            frame.setObjectName("ConfigSection")
             f_layout = QVBoxLayout(frame)
             f_layout.setContentsMargins(25, 25, 25, 25)
             f_layout.setSpacing(15)
@@ -309,7 +354,6 @@ class MainWindow(QMainWindow):
             grid_layout.addWidget(lbl, row_idx, 0)
             val_init = self.controller.config_manager.data.get(key, "")
             
-            # Lógica de exibição da Variação (Inteiro para interface)
             if key == "variacao_peso_pct":
                 try:
                     val_init = int(float(val_init) * 100)
@@ -441,6 +485,34 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(content)
         main_tab_layout.addWidget(scroll)
+
+    def download_cloud_config(self):
+        """Baixa as configurações da nuvem manualmente e atualiza a UI."""
+        mgr = LicenseManager()
+        self.lbl_status.setText("Status: Conectando à nuvem...")
+        self.btn_cloud_sync.setEnabled(False)
+        self.btn_cloud_sync.setText(" BUSCANDO...")
+        QApplication.processEvents()
+
+        try:
+            valido, msg, data = mgr.validate()
+            if valido and data:
+                # 1. Aplica no Manager
+                self.controller.config_manager.apply_cloud_overrides(data)
+                # 2. Atualiza memória local da Window (importante para lista de municípios custom)
+                self.license_data = data 
+                # 3. Recarrega os campos visuais
+                self.refresh_config_tab() 
+                
+                ModernMessageBox("SUCESSO", "Configurações sincronizadas com a nuvem!\n\nOs campos foram atualizados conforme sua licença.", "SUCCESS", self).exec()
+            else:
+                ModernMessageBox("ERRO", f"Não foi possível baixar as configurações:\n{msg}", "ERROR", self).exec()
+        except Exception as e:
+            ModernMessageBox("ERRO CRÍTICO", f"Erro ao conectar: {e}", "ERROR", self).exec()
+        finally:
+            self.btn_cloud_sync.setEnabled(True)
+            self.btn_cloud_sync.setText(" BAIXAR MINHAS CONFIGURAÇÕES DA MINHA LICENÇA DA NUVEM")
+            self.lbl_status.setText(f"Status: Pronto")
 
     def reload_species_widgets(self):
         while self.species_layout.count():
@@ -577,8 +649,27 @@ class MainWindow(QMainWindow):
                 chk.setChecked(opt in saved_vals)
         
         self.reload_species_widgets()
+        
+        # Atualiza a lista de municípios com base na licença atual
+        self.combo_mun.clear()
+        lista_municipios = ["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"]
+        
+        # Tenta pegar lista customizada da memória da licença
+        if self.license_data and "perfil_config" in self.license_data:
+             custom = self.license_data["perfil_config"].get("municipios_custom")
+             if custom and isinstance(custom, list):
+                 lista_municipios = custom
+                 if "Outros" not in lista_municipios:
+                     lista_municipios.append("Outros")
+                     
+        self.combo_mun.addItems(lista_municipios)
+
         mun = self.controller.config_manager.data.get("municipio_padrao")
-        self.combo_mun.setCurrentText(mun)
+        if mun in lista_municipios:
+            self.combo_mun.setCurrentText(mun)
+        else:
+            self.combo_mun.setCurrentIndex(0)
+            
         self.entry_mun_manual.setText(self.controller.config_manager.data.get("municipio_manual", ""))
 
     def open_month_selector(self):

@@ -5,37 +5,41 @@ from core.constants import BASE_DIR, CONFIG_FILE, MESES_DEFESO_PADRAO, MESES_PRO
 class ConfigManager:
     # Configuração Padrão
     DEFAULT_CONFIG = {
+        # Dados Pessoais / Básicos
         "municipio_padrao": "Nova Olinda do Maranhão",
         "municipio_manual": "",
         "uf_residencia": "MARANHAO",
         "categoria": "Artesanal",
         "forma_atuacao": "Desembarcado",
+        
+        # Atividade - Detalhes
         "relacao_trabalho": "Economia Familiar",
         "estado_comercializacao": "MARANHAO",
+        "grupos_alvo": ["Peixes"],
+        "compradores": ["Venda direta ao consumidor", "Outros"],
 
         # Local e Pesca
         "local_pesca_tipo": "Rio",
         "uf_pesca": "MARANHAO",
         "nome_local_pesca": "RIO TURI",
-        "metodos_pesca": ["Tarrafa"], # Padrão solicitado: Apenas Tarrafa
+        "metodos_pesca": ["Tarrafa"], 
 
-        # Checkboxes
-        "grupos_alvo": ["Peixes"],
-        "compradores": ["Venda direta ao consumidor", "Outros"],
-
-        # Financeiro
+        # Financeiro e Produção
         "dias_min": 18,
         "dias_max": 22,
         "meta_financeira_min": 990.00,
         "meta_financeira_max": 1100.00,
         "variacao_peso_pct": 0.15,
 
-        # Meses Configurados
+        # Meses Configurados (Controle de Checkboxes da UI)
         "meses_selecionados": TODOS_MESES_ORDENADOS.copy(),
-        # Referência de meses (não editável via GUI, mas salvo)
+        
+        # Referência de Lógica (Estes definem o comportamento do robô)
+        # Podem ser sobrescritos pelo JSON da nuvem
         "meses_defeso": MESES_DEFESO_PADRAO,
         "meses_producao": MESES_PRODUCAO_PADRAO,
 
+        # Resultado Anual
         "catalogo_especies": [
             {"nome": "Branquinha",                  "preco": 12.00, "kg_base": 21},
             {"nome": "Mandi",                       "preco": 15.00, "kg_base": 20},
@@ -63,6 +67,7 @@ class ConfigManager:
                     config = self.DEFAULT_CONFIG.copy()
                     config.update(loaded)
 
+                    # Correção legada específica
                     if "catalogo_especies" in config:
                         for esp in config["catalogo_especies"]:
                             if esp["nome"] == "Surubim":
@@ -89,3 +94,67 @@ class ConfigManager:
         if sel == "Outros":
             return self.data.get("municipio_manual", "")
         return sel
+
+    def apply_cloud_overrides(self, license_data):
+        """
+        Aplica configurações vindas da nuvem (JSON da Licença).
+        Isso permite personalizar UF, Espécies, Municípios e Regras de Negócio por cliente.
+        """
+        if not license_data:
+            return
+
+        # 1. Busca perfil de configuração no JSON
+        perfil = license_data.get("perfil_config", {})
+        if not perfil:
+            return
+
+        print("Aplicando perfil de configuração da nuvem...")
+        changed = False
+
+        # Lista MESTRA de chaves permitidas para sobrescrever (Cobre sua solicitação completa)
+        keys_to_override = [
+            # 1. Localização e Dados Básicos
+            "uf_residencia", 
+            "municipio_padrao", 
+            "municipio_manual",
+            "categoria", 
+            "forma_atuacao",
+            
+            # 2. Detalhes da Atividade
+            "relacao_trabalho", 
+            "estado_comercializacao",
+            "grupos_alvo", 
+            "compradores",
+            
+            # 3. Regras de Tempo (Meses de realização e não realização)
+            "meses_defeso",   # Meses de não realização
+            "meses_producao", # Meses de realização
+            "dias_min", 
+            "dias_max",
+            
+            # 4. Local Específico da Pesca
+            "local_pesca_tipo", 
+            "uf_pesca", 
+            "nome_local_pesca",
+            "metodos_pesca", # Petrecho
+            
+            # 5. Resultado Anual (Espécies e Valores)
+            "catalogo_especies", 
+            "meta_financeira_min", 
+            "meta_financeira_max", 
+            "variacao_peso_pct"
+        ]
+
+        for key in keys_to_override:
+            if key in perfil:
+                # Verifica se o valor é diferente para evitar escritas desnecessárias,
+                # mas garante que a nuvem tem autoridade sobre o local.
+                # Para listas (como catalogo_especies), a comparação direta funciona bem em Python.
+                if self.data.get(key) != perfil[key]:
+                    self.data[key] = perfil[key]
+                    changed = True
+        
+        # Salva se houve mudança para persistir nas próximas aberturas
+        if changed:
+            self.save()
+            print("Configurações atualizadas via nuvem com sucesso.")
