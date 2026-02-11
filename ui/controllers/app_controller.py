@@ -103,26 +103,20 @@ class AppController(QObject):
         self.current_worker.start()
 
     def stop_automation(self):
-        """Interrompe a automação, scripts e fecha a conexão do Selenium."""
         self.stop_event.set()
-        self.logger.error(">>> PARANDO TUDO... <<<", extra={'tags': 'ERROR'})
-        
-        # Forçar parada do Selenium e Scripts
+        self.logger.error(">>> PARANDO... <<<", extra={'tags': 'ERROR'})
+        # Forçar parada do Selenium
         if self.automation and self.automation.driver:
             try:
-                # Tenta parar o carregamento da página via JS
                 self.automation.driver.execute_script("window.stop();")
-            except:
-                pass
+            except: pass
             
             try:
-                # Encerra a sessão do driver para matar qualquer execução pendente
                 self.automation.driver.quit()
                 self.automation.driver = None
                 self.logger.info("Conexão Selenium encerrada.", extra={'tags': 'WARNING'})
-            except Exception as e:
-                self.logger.error(f"Erro ao fechar driver: {e}")
-
+            except: pass
+            
         self.status_signal.emit("Parado", "#EF4444")
 
     def open_tabs(self):
@@ -138,8 +132,8 @@ class AppController(QObject):
         def search_task():
             if not self.automation:
                 return
-
-            # Se o driver foi fechado (pelo stop), tenta reconectar silenciosamente ou falha
+            
+            # Reconectar se necessário
             if not self.automation.driver:
                 self.logger.info("Reconectando driver para busca...")
                 if not self.automation.obter_driver_robusto():
@@ -179,7 +173,6 @@ class AppController(QObject):
                 results = []
                 for idx, row in enumerate(linhas):
                     txt = row.text
-                    # Logic from original code
                     status_text = ""
                     try:
                         status_elem = row.find_element(By.XPATH, ".//td[contains(@class, 'status')]")
@@ -225,15 +218,9 @@ class AppController(QObject):
         self.logger.info(f"Iniciando {ano} | Meses: {len(meses_selecionados)} selecionados", extra={'tags': 'DESTAK'})
 
         def run_task():
-            # Verificacao de segurança do driver
             if not self.automation or not self.automation.driver:
-                 self.logger.info("Driver desconectado. Tentando reconectar...")
-                 if self.automation:
-                     self.automation.obter_driver_robusto()
-                 
-                 if not self.automation or not self.automation.driver:
-                     self.execution_error.emit("Navegador não conectado.")
-                     return
+                 self.execution_error.emit("Navegador não conectado.")
+                 return
 
             if self.automation:
                 self.automation.trazer_navegador_frente()
@@ -267,9 +254,7 @@ class AppController(QObject):
                 self.execution_error.emit("INTERRUPTED")
 
             except Exception as e:
-                # Se o erro for de sessão inválida (causado pelo Stop matando o driver), tratamos como interrupção
-                if "invalid session id" in str(e).lower() or "no such execution context" in str(e).lower():
-                     self.logger.warning("Sessão encerrada (Stop).")
+                if "invalid session" in str(e).lower():
                      self.execution_error.emit("INTERRUPTED")
                 else:
                      self.logger.error(f"Erro execução: {e}")
@@ -280,8 +265,7 @@ class AppController(QObject):
 
     def force_return_home(self):
         if self.automation:
-             # Se o driver foi morto pelo stop, precisamos reconectar para voltar ao home
+             # Reconectar se stop matou a sessão
              if not self.automation.driver:
                  self.automation.obter_driver_robusto()
-             
              threading.Thread(target=self.automation.forcar_retorno_inicio, daemon=True).start()

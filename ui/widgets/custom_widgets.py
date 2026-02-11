@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QVBoxLayout, 
     QLabel, QPushButton, QHBoxLayout, QFrame, QWidget, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QPoint
 from PySide6.QtGui import QIcon
 
 class NoWheelComboBox(QComboBox):
@@ -21,37 +21,35 @@ class NoWheelDoubleSpinBox(QDoubleSpinBox):
 
 class ModernMessageBox(QDialog):
     """
-    Um pop-up moderno, compacto, responsivo e com controles de janela.
+    Pop-up moderno com barra de título customizada e minimização global.
     """
     def __init__(self, title, message, icon_type="INFO", parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        # WindowStaysOnTopHint para ficar sobre qualquer programa
+        # Flags: Sem borda nativa, mas mantém comportamento de janela no topo
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
-        # Tamanho
-        self.setFixedWidth(360) 
+        self.setFixedWidth(400) 
         
-        # Cores baseadas no tipo
+        # Definição de Cores
         if icon_type == "ERROR":
-            self.accent_color = "#EF4444" # Red
+            self.accent_color = "#EF4444" 
             title_text = "ERRO"
         elif icon_type == "WARNING":
-            self.accent_color = "#F59E0B" # Amber
+            self.accent_color = "#F59E0B" 
             title_text = "ATENÇÃO"
         elif icon_type == "SUCCESS":
-            self.accent_color = "#10B981" # Green
+            self.accent_color = "#10B981" 
             title_text = "SUCESSO"
         else:
-            self.accent_color = "#38BDF8" # Blue
+            self.accent_color = "#38BDF8" 
             title_text = title
 
-        # Layout Principal
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Container (Borda e Fundo)
+        # Container de Fundo
         container = QFrame()
         container.setStyleSheet(f"""
             QFrame {{
@@ -64,69 +62,72 @@ class ModernMessageBox(QDialog):
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
         
-        # --- Barra de Título Customizada ---
+        # --- BARRA DE TÍTULO ---
         title_bar = QWidget()
-        title_bar.setFixedHeight(40)
+        title_bar.setFixedHeight(35)
         title_bar.setStyleSheet("background-color: transparent; border: none;")
         title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(15, 0, 5, 0) # Margem esq para texto, dir para botoes
+        title_layout.setContentsMargins(15, 0, 5, 0)
         
         # Título
         lbl_title = QLabel(title_text)
-        lbl_title.setStyleSheet(f"color: {self.accent_color}; font-size: 14px; font-weight: bold; border: none; font-family: 'Roboto';")
+        lbl_title.setStyleSheet(f"color: {self.accent_color}; font-size: 13px; font-weight: bold; border: none; font-family: 'Roboto';")
         title_layout.addWidget(lbl_title)
         
         title_layout.addStretch()
         
-        # Botão Minimizar
-        btn_min = QPushButton("−") # Unicode minus
+        # Botão Minimizar (-)
+        btn_min = QPushButton("─") 
         btn_min.setObjectName("WindowControl")
         btn_min.setFixedSize(30, 30)
         btn_min.setCursor(Qt.PointingHandCursor)
-        btn_min.clicked.connect(self.showMinimized)
+        # Conecta à função que minimiza o app todo
+        btn_min.clicked.connect(self.minimize_app)
         title_layout.addWidget(btn_min)
 
-        # Botão Fechar
-        btn_close = QPushButton("✕") # Unicode multiplication X
+        # Botão Fechar (X)
+        btn_close = QPushButton("✕") 
         btn_close.setObjectName("WindowControl")
-        btn_close.setObjectName("WindowClose") # Para cor vermelha no hover (QSS)
         btn_close.setFixedSize(30, 30)
         btn_close.setCursor(Qt.PointingHandCursor)
+        # Hover vermelho inline para garantir prioridade
+        btn_close.setStyleSheet("QPushButton#WindowControl:hover { background-color: #EF4444; color: white; }")
         btn_close.clicked.connect(self.reject)
         title_layout.addWidget(btn_close)
         
         container_layout.addWidget(title_bar)
         
-        # --- Conteúdo ---
+        # --- ÁREA DE CONTEÚDO ---
         content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: transparent; border: none;")
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(20, 10, 20, 20)
-        content_layout.setSpacing(15)
+        content_layout.setSpacing(20)
 
         # Mensagem
         lbl_msg = QLabel(message)
         lbl_msg.setWordWrap(True)
-        lbl_msg.setStyleSheet("color: #E2E8F0; font-size: 13px; font-family: 'Roboto'; border: none;")
+        lbl_msg.setStyleSheet("color: #E2E8F0; font-size: 14px; font-family: 'Roboto'; border: none;")
         content_layout.addWidget(lbl_msg)
         
-        # Botões de Ação
+        # Botão Principal (OK / JÁ ESTOU LOGADO)
         btn_layout = QHBoxLayout()
-        
         self.btn_ok = QPushButton("OK")
         self.btn_ok.setCursor(Qt.PointingHandCursor)
         self.btn_ok.setMinimumHeight(35)
-        # Expandir horizontalmente para preencher
         self.btn_ok.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
+        # Estilo específico para este botão, garantindo visibilidade e fonte
         self.btn_ok.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.accent_color};
                 color: #0F172A;
-                font-weight: bold;
-                font-size: 12px;
-                border-radius: 4px;
+                font-weight: 900;
+                font-size: 13px;
+                border-radius: 6px;
                 border: none;
                 font-family: 'Roboto';
+                text-transform: uppercase;
             }}
             QPushButton:hover {{
                 background-color: white;
@@ -137,11 +138,22 @@ class ModernMessageBox(QDialog):
         
         content_layout.addLayout(btn_layout)
         container_layout.addWidget(content_widget)
-        
         main_layout.addWidget(container)
 
+    def minimize_app(self):
+        """Minimiza a janela pai (programa principal) se existir."""
+        if self.parent():
+            try:
+                # Tenta acessar a janela principal e minimizá-la
+                # window() retorna a janela de nível superior que contém este widget
+                self.parent().window().showMinimized()
+            except:
+                self.showMinimized()
+        else:
+            self.showMinimized()
+
+    # Permitir arrastar a janela clicando no corpo (já que não tem barra nativa)
     def mousePressEvent(self, event):
-        # Permitir arrastar a janela sem barra nativa
         if event.button() == Qt.LeftButton:
             self.oldPos = event.globalPos()
 

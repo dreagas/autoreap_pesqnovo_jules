@@ -1,135 +1,40 @@
-/* GLOBAL */
+/* --- GLOBAL --- */
 QWidget {
-    background-color: #0F172A; /* Slate 900 */
-    color: #F1F5F9; /* Slate 100 */
+    background-color: #0F172A; /* Azul Escuro Profundo */
+    color: #F1F5F9; /* Texto Claro */
     font-family: "Roboto", "Segoe UI", sans-serif;
     font-size: 14px;
-    font-weight: normal;
+    font-weight: normal; /* Reset de peso */
 }
 
-/* WINDOWS & DIALOGS */
+/* Janelas */
 QMainWindow, QDialog {
     background-color: #0F172A;
 }
 
-/* TAB WIDGET */
-QTabWidget::pane {
-    border: 1px solid #334155;
-    background-color: #0F172A;
-    border-radius: 6px;
-}
-
-QTabBar::tab {
-    background-color: #0F172A;
-    color: #94A3B8;
-    padding: 12px 24px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    margin-right: 2px;
-    font-weight: bold;
-}
-
-QTabBar::tab:selected {
-    background-color: #1E293B;
-    color: #38BDF8;
-    border-bottom: 3px solid #38BDF8;
-}
-
-QTabBar::tab:hover {
-    background-color: #1E293B;
-    color: #E2E8F0;
-}
-
-/* TEXTOS TRANSPARENTES */
-QLabel, QCheckBox {
-    background-color: transparent;
-}
-
-/* CARDS & FRAMES */
-QFrame#ConfigSection, QFrame#Card {
-    background-color: #1E293B;
-    border-radius: 10px;
-    border: 1px solid #334155;
-}
-
-QFrame#Sidebar {
-    background-color: #1E293B;
-    border-right: 1px solid #334155;
-}
-
-/* INPUTS */
-QLineEdit, QPlainTextEdit, QTextEdit {
-    background-color: #020617;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 10px 12px;
-    color: #FFFFFF;
-    selection-background-color: #38BDF8;
-    font-family: "Roboto";
-}
-
-QLineEdit:focus {
-    border: 1px solid #38BDF8;
-}
-
-/* COMBOBOX */
-QComboBox {
-    background-color: #020617;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 8px 12px;
-    color: #FFFFFF;
-    min-height: 32px;
-    font-family: "Roboto";
-}
-
-QComboBox:focus {
-    border: 1px solid #38BDF8;
-}
-
-QComboBox::drop-down {
-    subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 35px;
-    border-left: none;
-    background-color: transparent;
-}
-
-QComboBox::down-arrow {
-    image: url(none);
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 8px solid #38BDF8;
-    margin-top: 2px;
-    margin-right: 10px;
-}
-
-QComboBox QAbstractItemView {
-    background-color: #1E293B;
-    border: 1px solid #334155;
-    selection-background-color: #38BDF8;
-    selection-color: #000000;
-    color: #FFFFFF;
-}
-
-/* BUTTONS GERAIS (Centralizados) */
+/* --- BOTÕES (Estilo Robusto e Centralizado) --- */
 QPushButton {
-    background-color: #334155;
+    background-color: #334155; /* Azul Slate */
     color: #FFFFFF;
-    border: none;
+    border: 1px solid #475569;
     border-radius: 8px;
-    padding: 0 20px;
     min-height: 45px;
-    font-weight: normal;
-    font-size: 14px;
+    
+    /* Tipografia e Alinhamento */
+    font-family: "Roboto", "Segoe UI", sans-serif;
+    font-size: 13px;
+    font-weight: normal; /* Normal por padrão */
     text-transform: uppercase;
-    text-align: center; /* Centralizado */
-    font-family: "Roboto";
+    
+    /* Centralização Absoluta */
+    text-align: center;
+    padding: 0 10px;
+    margin: 2px;
 }
 
 QPushButton:hover {
     background-color: #475569;
-    border: 1px solid #64748B;
+    border-color: #94A3B8;
 }
 
 QPushButton:pressed {
@@ -139,97 +44,187 @@ QPushButton:pressed {
 
 QPushButton:disabled {
     background-color: #1E293B;
-    color: #475569;
-    border: 1px solid #334155;
+    color: #64748B;
+    border-color: #334155;
 }
 
-/* BOTÕES DE DESTAQUE (Negrito) */
+/* Botões de Destaque (Definidos como BoldButton no Python) */
 QPushButton#BoldButton {
-    font-weight: 900;
+    background-color: #0284C7; /* Azul Vivo */
+    border-color: #0369A1;
+    font-weight: 900; /* Extra Negrito */
     font-size: 14px;
-    letter-spacing: 0.5px;
+    color: #FFFFFF;
+}
+QPushButton#BoldButton:hover {
+    background-color: #0369A1;
 }
 
-/* BOTÕES DE JANELA (Minimizar/Fechar no Popup) */
+/* Botões de Controle de Janela (Minimizar/Fechar) */
 QPushButton#WindowControl {
     background-color: transparent;
     border: none;
-    font-weight: bold;
-    font-size: 16px;
-    color: #94A3B8;
     min-height: 30px;
-    min-width: 30px;
+    max-width: 30px;
+    font-size: 18px; /* Fonte maior para o símbolo */
+    font-weight: bold;
+    color: #94A3B8;
+    margin: 0;
     padding: 0;
-    border-radius: 4px;
 }
 QPushButton#WindowControl:hover {
     background-color: #334155;
     color: #FFFFFF;
 }
-QPushButton#WindowClose:hover {
-    background-color: #EF4444;
+
+/* --- COMBOBOX (Dropdown) --- */
+QComboBox {
+    background-color: #020617; /* Quase preto */
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 5px 10px;
     color: #FFFFFF;
+    min-height: 35px;
+    font-family: "Roboto", sans-serif;
 }
 
-/* SCROLLBARS */
+QComboBox:focus {
+    border: 1px solid #38BDF8;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 30px;
+    border-left: none; /* Sem borda divisória */
+    background-color: transparent;
+}
+
+/* Correção da Seta (Triângulo) */
+QComboBox::down-arrow {
+    image: none; /* Garante que não use imagem padrão do sistema */
+    width: 0px;  /* Largura 0 é essencial para o truque da borda triangular */
+    height: 0px; /* Altura 0 é essencial */
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #38BDF8; /* Cor da seta (Azul Claro) */
+    margin-right: 10px; /* Afastamento da direita */
+    margin-top: 2px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    selection-background-color: #38BDF8;
+    selection-color: #000000;
+    color: #FFFFFF;
+    outline: none;
+}
+
+/* --- CHECKBOX --- */
+QCheckBox {
+    spacing: 10px;
+    color: #E2E8F0;
+    font-size: 14px;
+    font-family: "Roboto", sans-serif;
+}
+
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+/* Estado: Não Marcado (Caixa vazia com borda cinza) */
+QCheckBox::indicator:unchecked {
+    background-color: transparent;
+    border: 2px solid #64748B;
+}
+
+QCheckBox::indicator:unchecked:hover {
+    border-color: #38BDF8;
+}
+
+/* Estado: Marcado (Caixa Azul Sólida com Check) */
+QCheckBox::indicator:checked {
+    background-color: #38BDF8;
+    border: 2px solid #38BDF8;
+    /* Se a imagem 'img/check.png' existir, ela aparece. Se não, fica um quadrado azul (fallback elegante) */
+    image: url(img/check.png); 
+}
+
+/* --- INPUTS DE TEXTO --- */
+QLineEdit, QPlainTextEdit, QTextEdit {
+    background-color: #020617;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px;
+    color: #FFFFFF;
+    selection-background-color: #38BDF8;
+    font-family: "Roboto", sans-serif;
+}
+QLineEdit:focus {
+    border: 1px solid #38BDF8;
+}
+
+/* --- LOG --- */
+QTextEdit#LogBox {
+    background-color: #020617;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    font-family: "Consolas", monospace;
+    font-size: 12px;
+    color: #94A3B8;
+}
+
+/* --- SCROLLBARS --- */
 QScrollBar:vertical {
     background: #0F172A;
-    width: 10px;
+    width: 8px;
+    margin: 0;
 }
-
 QScrollBar::handle:vertical {
     background: #334155;
     min-height: 40px;
-    border-radius: 5px;
+    border-radius: 4px;
 }
-
 QScrollBar::handle:vertical:hover {
     background: #475569;
 }
-
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;
     border: none;
 }
 
-/* CHECKBOX */
-QCheckBox {
-    spacing: 12px;
-    font-size: 14px;
-    color: #E2E8F0;
-    font-family: "Roboto";
-}
-
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-    background-color: transparent;
-    border: 2px solid #475569;
-    border-radius: 4px;
-}
-
-QCheckBox::indicator:hover {
-    border-color: #38BDF8;
-}
-
-QCheckBox::indicator:checked {
-    border-color: #38BDF8;
-    background-color: transparent;
-    image: url(img/check.png); 
-}
-
-/* STATUS BAR */
-QStatusBar {
+/* --- FRAMES --- */
+QFrame#Card, QFrame#ConfigSection {
     background-color: #1E293B;
-    color: #94A3B8;
-    border-top: 1px solid #334155;
+    border: 1px solid #334155;
+    border-radius: 10px;
+}
+QFrame#Sidebar {
+    background-color: #1E293B;
+    border-right: 1px solid #334155;
 }
 
-/* LOG */
-QTextEdit#LogBox {
-    background-color: #020617;
+/* --- ABAS --- */
+QTabWidget::pane {
     border: 1px solid #334155;
-    border-radius: 8px;
-    font-family: "Consolas", monospace; /* Log fica melhor com monospace */
+    background-color: #0F172A;
+    border-radius: 6px;
+}
+QTabBar::tab {
+    background-color: #0F172A;
+    color: #94A3B8;
+    padding: 10px 20px;
+    font-weight: bold;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    font-family: "Roboto", sans-serif;
+}
+QTabBar::tab:selected {
+    background-color: #1E293B;
+    color: #38BDF8;
+    border-bottom: 2px solid #38BDF8;
 }
