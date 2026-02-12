@@ -16,19 +16,33 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, Sta
 
 from core.constants import (
     CHROME_DEBUG_PORT,
+    EDGE_DEBUG_PORT,
     CHROME_PROFILE_PATH,
+    EDGE_PROFILE_PATH,
     URLS_ABERTURA,
     URL_ALVO,
     MESES_DEFESO_PADRAO,
-    MESES_PRODUCAO_PADRAO
+    MESES_PRODUCAO_PADRAO,
+    BROWSER_CHROME,
+    BROWSER_EDGE
 )
 
 class AutomationLogic:
-    def __init__(self, logger, stop_event, config_manager):
+    def __init__(self, logger, stop_event, config_manager, browser_type=BROWSER_CHROME):
         self.logger = logger
         self.stop_event = stop_event
         self.driver = None
         self.cfg = config_manager
+        self.browser_type = browser_type
+
+        # Define portas e perfis com base no navegador
+        if self.browser_type == BROWSER_EDGE:
+            self.debug_port = EDGE_DEBUG_PORT
+            self.profile_path = EDGE_PROFILE_PATH
+        else:
+            self.debug_port = CHROME_DEBUG_PORT
+            self.profile_path = CHROME_PROFILE_PATH
+
         try:
             import psutil
             self.psutil_ref = psutil
@@ -46,7 +60,7 @@ class AutomationLogic:
         text = text.replace("R$", "").replace("\u00a0", "").strip()
         return text.lower()
 
-    # --- CHROME ENGINE ---
+    # --- BROWSER ENGINE ---
     def is_port_in_use(self, port):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex(('127.0.0.1', port)) == 0
@@ -62,28 +76,48 @@ class AutomationLogic:
                 return c
         return None
 
-    def fechar_chrome_brutalmente(self):
+    def encontrar_executavel_edge(self):
+        caminhos = [
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\Application\msedge.exe")
+        ]
+        for c in caminhos:
+            if os.path.exists(c):
+                return c
+        return None
+
+    def fechar_navegador_brutalmente(self):
+        if self.browser_type == BROWSER_EDGE:
+            proc_name = "msedge.exe"
+        else:
+            proc_name = "chrome.exe"
+
         try:
-            subprocess.run("taskkill /f /im chrome.exe", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(f"taskkill /f /im {proc_name}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
 
-    def garantir_chrome_aberto(self):
-        if self.is_port_in_use(CHROME_DEBUG_PORT):
-            self.logger.info("Chrome já está rodando na porta de debug. Conectando...", extra={'tags': 'SUCCESS'})
+    def garantir_navegador_aberto(self):
+        if self.is_port_in_use(self.debug_port):
+            self.logger.info(f"{self.browser_type.capitalize()} já está rodando na porta de debug. Conectando...", extra={'tags': 'SUCCESS'})
             return True
 
-        self.logger.info("Iniciando nova instância do Chrome...", extra={'tags': 'INFO'})
-        chrome_exe = self.encontrar_executavel_chrome()
+        self.logger.info(f"Iniciando nova instância do {self.browser_type.capitalize()}...", extra={'tags': 'INFO'})
 
-        if chrome_exe:
-            if not os.path.exists(CHROME_PROFILE_PATH):
-                try: os.makedirs(CHROME_PROFILE_PATH, exist_ok=True)
+        if self.browser_type == BROWSER_EDGE:
+            executavel = self.encontrar_executavel_edge()
+        else:
+            executavel = self.encontrar_executavel_chrome()
+
+        if executavel:
+            if not os.path.exists(self.profile_path):
+                try: os.makedirs(self.profile_path, exist_ok=True)
                 except: pass
 
             cmd = [
-                chrome_exe,
-                f"--remote-debugging-port={CHROME_DEBUG_PORT}",
-                rf"--user-data-dir={CHROME_PROFILE_PATH}",
+                executavel,
+                f"--remote-debugging-port={self.debug_port}",
+                rf"--user-data-dir={self.profile_path}",
                 "--no-first-run", "--no-default-browser-check", "--start-maximized",
                 "--disable-popup-blocking"
             ] + URLS_ABERTURA
@@ -95,16 +129,26 @@ class AutomationLogic:
             )
             for i in range(20):
                 time.sleep(0.5)
-                if self.is_port_in_use(CHROME_DEBUG_PORT):
+                if self.is_port_in_use(self.debug_port):
                     return True
         return False
 
     def conectar_selenium(self):
-        self.logger.info("Tentando conectar Selenium ao navegador...")
-        opts = Options()
-        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{CHROME_DEBUG_PORT}")
+        self.logger.info(f"Tentando conectar Selenium ao {self.browser_type}...")
+
+        if self.browser_type == BROWSER_EDGE:
+            opts = webdriver.EdgeOptions()
+        else:
+            opts = webdriver.ChromeOptions()
+
+        opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{self.debug_port}")
+
         try:
-            self.driver = webdriver.Chrome(options=opts)
+            if self.browser_type == BROWSER_EDGE:
+                self.driver = webdriver.Edge(options=opts)
+            else:
+                self.driver = webdriver.Chrome(options=opts)
+
             # Teste de vida
             _ = self.driver.current_window_handle
             self.logger.info("Conexão Selenium ESTABELECIDA com sucesso!", extra={'tags': 'SUCCESS'})
@@ -114,8 +158,8 @@ class AutomationLogic:
             return None
 
     def obter_driver_robusto(self):
-        if not self.is_port_in_use(CHROME_DEBUG_PORT):
-            self.garantir_chrome_aberto()
+        if not self.is_port_in_use(self.debug_port):
+            self.garantir_navegador_aberto()
 
         driver = self.conectar_selenium()
         
@@ -127,10 +171,10 @@ class AutomationLogic:
             driver = None
 
         if not driver:
-            self.logger.warning("Conexão falhou ou driver 'zumbi'. Reiniciando Chrome...")
-            self.fechar_chrome_brutalmente()
+            self.logger.warning(f"Conexão falhou ou driver 'zumbi'. Reiniciando {self.browser_type}...")
+            self.fechar_navegador_brutalmente()
             time.sleep(1)
-            self.garantir_chrome_aberto()
+            self.garantir_navegador_aberto()
             driver = self.conectar_selenium()
         
         self.driver = driver

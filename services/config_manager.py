@@ -5,6 +5,9 @@ from core.constants import BASE_DIR, CONFIG_FILE, MESES_DEFESO_PADRAO, MESES_PRO
 class ConfigManager:
     # Configuração Padrão
     DEFAULT_CONFIG = {
+        # Configuração de Navegador
+        "navegador_padrao": "chrome",
+
         # Dados Pessoais / Básicos
         "municipio_padrao": "Nova Olinda do Maranhão",
         "municipio_manual": "",
@@ -124,6 +127,9 @@ class ConfigManager:
 
         # Lista MESTRA de chaves permitidas para sobrescrever (Cobre sua solicitação completa)
         keys_to_override = [
+            # 0. Navegador
+            "navegador_padrao",
+
             # 1. Localização e Dados Básicos
             "uf_residencia", 
             "municipio_padrao", 
