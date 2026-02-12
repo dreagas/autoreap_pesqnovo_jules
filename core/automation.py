@@ -1,8 +1,6 @@
 import os
-import sys
 import time
 import subprocess
-import re
 import unicodedata
 import random
 import socket
@@ -41,11 +39,6 @@ class AutomationLogic:
         if self.stop_event.is_set():
             self.logger.warning(">>> INTERRUPÇÃO IMEDIATA SOLICITADA PELO USUÁRIO <<<")
             raise InterruptedError("Parada solicitada")
-
-    def tiny_sleep(self, seconds=0.0):
-        self.check_stop()
-        if seconds > 0:
-            time.sleep(seconds)
 
     def normalize_text(self, text):
         if not text: return ""
@@ -147,6 +140,7 @@ class AutomationLogic:
         if not self.driver: return
         try:
             self.driver.minimize_window()
+            # Pequeno delay apenas para garantir que o SO processe
             time.sleep(0.1)
             self.driver.maximize_window()
             self.driver.switch_to.window(self.driver.current_window_handle)
@@ -190,7 +184,9 @@ class AutomationLogic:
             else:
                 self.logger.info("Aba PesqBrasil não encontrada. Abrindo nova guia...", extra={'tags': 'WARNING'})
                 driver.execute_script(f"window.open('{URL_ALVO}', '_blank');")
-                time.sleep(1.5)
+
+                # Espera inteligente pela nova janela
+                WebDriverWait(driver, 5).until(lambda d: len(d.window_handles) > len(janelas))
                 driver.switch_to.window(driver.window_handles[-1])
                 return True
 
@@ -224,7 +220,6 @@ class AutomationLogic:
             count_abertas = 0
             for url_alvo in URLS_ABERTURA:
                 # Simplificação: verifica se parte da URL alvo está em alguma aberta
-                # Ex: "cadunico" em "https://cadunico..."
                 keyword = ""
                 if "cadunico" in url_alvo: keyword = "cadunico"
                 elif "esocial" in url_alvo: keyword = "esocial"
@@ -241,6 +236,7 @@ class AutomationLogic:
                     self.logger.info(f"Abrindo aba faltante: {keyword}")
                     self.driver.execute_script(f"window.open('{url_alvo}', '_blank');")
                     count_abertas += 1
+                    # Pequeno delay para garantir que o navegador processe a abertura
                     time.sleep(0.5)
             
             if count_abertas == 0:
@@ -273,11 +269,13 @@ class AutomationLogic:
         self.logger.info(f"Digitando '{texto}'...")
         try:
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", elemento)
-            try: elemento.clear()
-            except: pass
 
+            # Padronização: Clicar -> Limpar -> Inserir
             try:
                 self.driver.execute_script("arguments[0].click();", elemento)
+            except: pass
+
+            try: elemento.clear()
             except: pass
 
             elemento.send_keys(Keys.CONTROL + "a")
@@ -322,7 +320,12 @@ class AutomationLogic:
                 if eh_busca:
                     input_elem.clear()
                     input_elem.send_keys(valor)
-                    time.sleep(0.5)
+                    # Espera explicita para a lista filtrar
+                    try:
+                        WebDriverWait(driver, 2).until(
+                            lambda d: len(lista.find_elements(By.TAG_NAME, "label")) > 0
+                        )
+                    except: pass
 
                 opcoes = lista.find_elements(By.TAG_NAME, "label")
                 match_candidato = None
@@ -355,6 +358,7 @@ class AutomationLogic:
                 except: pass
 
             except Exception as e:
+                # Pequena pausa antes de re-tentar em caso de erro
                 time.sleep(0.5)
                 continue
 
@@ -424,7 +428,8 @@ class AutomationLogic:
 
         start_time = time.time()
         while True:
-            if time.time() - start_time > 10:
+            # Aumentado para 15s para evitar timeouts precoces em maquinas lentas
+            if time.time() - start_time > 15:
                 self.logger.warning(f"Timeout ao gerar valores para {mes_nome}.")
                 break
 
@@ -515,6 +520,7 @@ class AutomationLogic:
                     try:
                         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_add)
                         self.click_robusto(btn_add)
+                        # Otimização: WebDriverWait inteligente
                         WebDriverWait(self.driver, 2).until(lambda d: len(tabela.find_elements(By.XPATH, ".//tbody/tr")) > i)
                     except:
                         self.driver.execute_script("arguments[0].click();", btn_add)
@@ -635,9 +641,6 @@ class AutomationLogic:
             if not self.driver.execute_script("return arguments[0].checked;", chk):
                 self.click_robusto(chk)
                 self.logger.info("Termo aceito!", extra={'tags': 'SUCCESS'})
-            
-            # REMOVIDO: ctypes.windll.user32.MessageBoxW...
-            # A mensagem de sucesso agora é gerenciada pelo AppController -> UI
             
         except Exception as e:
             self.logger.error(f"Erro Etapa 4: {e}")

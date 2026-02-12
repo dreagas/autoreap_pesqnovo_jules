@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTabWidget, QScrollArea, QFrame, QLineEdit, QTextEdit, QMessageBox,
-    QGridLayout, QGroupBox, QCheckBox, QApplication, QSizePolicy, QSpacerItem
+    QTabWidget, QScrollArea, QFrame, QLineEdit, QTextEdit,
+    QGridLayout, QGroupBox, QCheckBox, QApplication,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, Slot, QSize, QTimer
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon
 
 from ui.controllers.app_controller import AppController
 from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
@@ -462,6 +463,17 @@ class MainWindow(QMainWindow):
         self.cfg_layout.addSpacing(20)
 
         # --- REVERTENDO PARA BOTÕES DIRETAMENTE NO LAYOUT (SEM CARD/FRAME ESCURO) ---
+
+        # Botão Exportar
+        btn_export = QPushButton(" EXPORTAR CONFIGURAÇÕES")
+        btn_export.setObjectName("BoldButton")
+        icon_path = os.path.join(IMG_DIR, "img_exportar.png")
+        if os.path.exists(icon_path):
+            btn_export.setIcon(QIcon(icon_path))
+            btn_export.setIconSize(QSize(24, 24))
+        btn_export.clicked.connect(self.export_config_file)
+        self.cfg_layout.addWidget(btn_export)
+
         btn_save_all = QPushButton(" SALVAR TODAS AS CONFIGURAÇÕES")
         btn_save_all.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_salvar.png")
@@ -582,6 +594,15 @@ class MainWindow(QMainWindow):
         self.controller.config_manager.save()
         ModernMessageBox("SUCESSO", "Preferência de município salva!", "SUCCESS", self).exec()
 
+    def export_config_file(self):
+        default_name = f"config_reap_backup.json"
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar Configurações", default_name, "JSON Files (*.json)")
+        if path:
+            if self.controller.config_manager.export_config(path):
+                ModernMessageBox("SUCESSO", f"Configurações exportadas para:\n{path}", "SUCCESS", self).exec()
+            else:
+                ModernMessageBox("ERRO", "Falha ao exportar arquivo.", "ERROR", self).exec()
+
     def save_full_config(self):
         for key, widget in self.config_widgets.items():
             if isinstance(widget, QLineEdit):
@@ -624,7 +645,7 @@ class MainWindow(QMainWindow):
         dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações e restaurará os valores padrão.", "WARNING", self)
         dlg.btn_ok.setText("SIM, RESTAURAR")
         if dlg.exec():
-            self.controller.config_manager.reset_to_defaults()
+            self.controller.config_manager.reset_to_defaults(self.license_data)
             self.refresh_config_tab()
 
     def refresh_config_tab(self):

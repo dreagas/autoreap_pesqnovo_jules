@@ -85,9 +85,20 @@ class ConfigManager:
         except Exception as e:
             print(f"Erro ao salvar config: {e}")
 
-    def reset_to_defaults(self):
+    def reset_to_defaults(self, license_data=None):
         self.data = self.DEFAULT_CONFIG.copy()
+        if license_data:
+            self.apply_cloud_overrides(license_data)
         self.save()
+
+    def export_config(self, filepath):
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, indent=4, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"Erro ao exportar config: {e}")
+            return False
 
     def get_municipio_efetivo(self):
         sel = self.data.get("municipio_padrao")
