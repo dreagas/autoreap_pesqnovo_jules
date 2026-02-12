@@ -1,20 +1,12 @@
 import sys
 import os
-import ctypes
-from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen
+from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen, QMessageBox
 from PySide6.QtGui import QIcon, QPixmap, QColor
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
-from core.constants import VERSION, IMG_DIR, resource_path
+from core.constants import VERSION, IMG_DIR, resource_path, BASE_DIR
 from services.license_manager import LicenseManager
 from services.updater import AutoUpdater
-
-# Ajuste para o ícone aparecer corretamente na barra de tarefas do Windows
-try:
-    myappid = f'autoreap.version.{VERSION}'
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-except:
-    pass
 
 def load_stylesheet(app):
     """
@@ -58,16 +50,24 @@ def check_license_and_updates(splash=None):
             if remote_data:
                 updater = AutoUpdater(VERSION, remote_data)
                 if updater.check_for_updates():
-                    # MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST
-                    resp = ctypes.windll.user32.MessageBoxW(
-                        0, 
-                        f"Uma nova versão ({remote_data.get('versao')}) está disponível!\n\nDeseja atualizar agora?", 
-                        "Atualização Disponível", 
-                        0x04 | 0x40 | 0x1000 
-                    )
-                    if resp == 6: # Botão 'Sim'
+                    # Usando QMessageBox ao invés de ctypes
+                    msg_box = QMessageBox()
+                    msg_box.setWindowTitle("Atualização Disponível")
+                    msg_box.setText(f"Uma nova versão ({remote_data.get('versao')}) está disponível!\n\nDeseja atualizar agora?")
+                    msg_box.setIcon(QMessageBox.Icon.Information)
+                    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                    msg_box.setWindowFlags(msg_box.windowFlags() | Qt.WindowStaysOnTopHint) # Garante que fique no topo
+
+                    resp = msg_box.exec()
+
+                    if resp == QMessageBox.StandardButton.Yes: # Botão 'Sim'
                         updater.download_and_install()
-                        # Se o update for iniciado, o programa fecha-se dentro da função
+
+                        info_box = QMessageBox()
+                        info_box.setWindowTitle("Download Concluído")
+                        info_box.setText("O pacote de atualização foi baixado.\nPor favor, verifique a pasta do programa e atualize manualmente.")
+                        info_box.setIcon(QMessageBox.Icon.Information)
+                        info_box.exec()
             
             return True, remote_data
         
@@ -98,14 +98,33 @@ def check_license_and_updates(splash=None):
             return False, None
 
 def main():
+    # 0. Data Truth Policy: Remove arquivos locais de configuração
+    # Para garantir sincronização limpa.
+    config_path = os.path.join(BASE_DIR, "autoreapmpa.json")
+    if os.path.exists(config_path):
+        try:
+            os.remove(config_path)
+            print("Configuração local removida para garantir sincronização.")
+        except Exception as e:
+            print(f"Erro ao limpar config local: {e}")
+
     # 1. Criação da aplicação (necessário antes de diálogos e temas)
     app = QApplication(sys.argv)
     app.setApplicationName("AutoREAPv2")
 
     # --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
-    splash_pix = QPixmap(450, 300)
-    splash_pix.fill(QColor("#0F172A")) # Fundo Azul Escuro do Tema
-    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+    splash_path = resource_path(os.path.join("img", "splashscreen.png"))
+    if os.path.exists(splash_path):
+        splash_pix = QPixmap(splash_path)
+    else:
+        # Fallback
+        splash_pix = QPixmap(450, 300)
+        splash_pix.fill(QColor("#0F172A"))
+
+    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+    splash.setAttribute(Qt.WA_TranslucentBackground) # Importante para transparência no Linux
+    if not splash_pix.isNull():
+        splash.setMask(splash_pix.mask())
 
     # Configura fonte da splash
     font = splash.font()

@@ -14,6 +14,7 @@ from services.license_manager import LicenseManager
 from core.constants import VERSION, LOG_FILE, IMG_DIR
 
 import os
+import subprocess
 
 class MainWindow(QMainWindow):
     def __init__(self, license_data=None):
@@ -461,24 +462,41 @@ class MainWindow(QMainWindow):
 
         self.cfg_layout.addSpacing(20)
 
-        # --- REVERTENDO PARA BOTÕES DIRETAMENTE NO LAYOUT (SEM CARD/FRAME ESCURO) ---
-        btn_save_all = QPushButton(" SALVAR TODAS AS CONFIGURAÇÕES")
+        # --- NOVOS BOTÕES (EXPORTAR, SALVAR, REDEFINIR) ---
+        bottom_btns_layout = QHBoxLayout()
+        bottom_btns_layout.setSpacing(10)
+
+        # EXPORTAR
+        btn_export = QPushButton(" EXPORTAR")
+        btn_export.setObjectName("BoldButton")
+        icon_path = os.path.join(IMG_DIR, "img_exportar.png")
+        if os.path.exists(icon_path):
+            btn_export.setIcon(QIcon(icon_path))
+            btn_export.setIconSize(QSize(24, 24))
+        btn_export.clicked.connect(self.export_config)
+        bottom_btns_layout.addWidget(btn_export)
+
+        # SALVAR
+        btn_save_all = QPushButton(" SALVAR TUDO")
         btn_save_all.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_salvar.png")
         if os.path.exists(icon_path):
             btn_save_all.setIcon(QIcon(icon_path))
             btn_save_all.setIconSize(QSize(24, 24))
         btn_save_all.clicked.connect(self.save_full_config)
-        self.cfg_layout.addWidget(btn_save_all)
+        bottom_btns_layout.addWidget(btn_save_all)
 
-        btn_reset = QPushButton(" RESTAURAR PADRÕES ORIGINAIS")
+        # REDEFINIR
+        btn_reset = QPushButton(" REDEFINIR")
         btn_reset.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_restaurar.png")
         if os.path.exists(icon_path):
             btn_reset.setIcon(QIcon(icon_path))
             btn_reset.setIconSize(QSize(24, 24))
-        btn_reset.clicked.connect(self.reset_config)
-        self.cfg_layout.addWidget(btn_reset)
+        btn_reset.clicked.connect(self.reset_and_sync)
+        bottom_btns_layout.addWidget(btn_reset)
+
+        self.cfg_layout.addLayout(bottom_btns_layout)
 
         self.cfg_layout.addStretch() # Empurra tudo para cima
 
@@ -512,6 +530,26 @@ class MainWindow(QMainWindow):
             self.btn_cloud_sync.setEnabled(True)
             self.btn_cloud_sync.setText(" BAIXAR MINHAS CONFIGURAÇÕES DA MINHA LICENÇA DA NUVEM")
             self.lbl_status.setText(f"Status: Pronto")
+
+    def export_config(self):
+        """Exporta a configuração para JSON."""
+        ok, path = self.controller.config_manager.export_config()
+        if ok:
+             ModernMessageBox("SUCESSO", f"Configuração exportada com sucesso para:\n\n{path}", "SUCCESS", self).exec()
+        else:
+             ModernMessageBox("ERRO", f"Falha ao exportar:\n{path}", "ERROR", self).exec()
+
+    def reset_and_sync(self):
+        """Redefine para padrões e busca atualização da nuvem."""
+        dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações locais, restaurará os padrões E buscará a última versão da nuvem.", "WARNING", self)
+        dlg.btn_ok.setText("SIM, REDEFINIR")
+        if dlg.exec():
+            # 1. Reseta para hardcoded defaults
+            self.controller.config_manager.reset_to_defaults()
+            # 2. Tenta baixar e aplicar override da nuvem
+            self.download_cloud_config()
+            # 3. Atualiza UI (já feito pelo download_cloud_config, mas se falhar lá, o reset já foi feito)
+            self.refresh_config_tab()
 
     def reload_species_widgets(self):
         while self.species_layout.count():
@@ -621,6 +659,7 @@ class MainWindow(QMainWindow):
         ModernMessageBox("SUCESSO", "Todas as configurações foram salvas!", "SUCCESS", self).exec()
 
     def reset_config(self):
+        # Legacy method (kept for safety, but UI now uses reset_and_sync)
         dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações e restaurará os valores padrão.", "WARNING", self)
         dlg.btn_ok.setText("SIM, RESTAURAR")
         if dlg.exec():
@@ -681,7 +720,7 @@ class MainWindow(QMainWindow):
 
     def open_logs(self):
         try:
-            os.startfile(LOG_FILE)
+            subprocess.call(['xdg-open', LOG_FILE])
         except Exception as e:
             ModernMessageBox("ERRO", f"Não foi possível abrir o log:\n{e}", "ERROR", self).exec()
 

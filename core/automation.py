@@ -7,6 +7,7 @@ import unicodedata
 import random
 import socket
 import traceback
+import shutil
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -59,19 +60,29 @@ class AutomationLogic:
             return s.connect_ex(('127.0.0.1', port)) == 0
 
     def encontrar_executavel_chrome(self):
-        caminhos = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+        caminhos_linux = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/opt/google/chrome/google-chrome"
         ]
-        for c in caminhos:
+
+        # Tenta encontrar no PATH primeiro
+        chrome_path = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("google-chrome-stable")
+        if chrome_path:
+            return chrome_path
+
+        for c in caminhos_linux:
             if os.path.exists(c):
                 return c
         return None
 
     def fechar_chrome_brutalmente(self):
         try:
-            subprocess.run("taskkill /f /im chrome.exe", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Linux: usa pkill para matar processos pelo nome
+            subprocess.run(["pkill", "-f", "chrome"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["pkill", "-f", "chromium"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
 
     def garantir_chrome_aberto(self):
@@ -92,24 +103,39 @@ class AutomationLogic:
                 f"--remote-debugging-port={CHROME_DEBUG_PORT}",
                 rf"--user-data-dir={CHROME_PROFILE_PATH}",
                 "--no-first-run", "--no-default-browser-check", "--start-maximized",
-                "--disable-popup-blocking"
+                "--disable-popup-blocking",
+                "--no-sandbox",
+                "--disable-dev-shm-usage"
             ] + URLS_ABERTURA
 
+            # No Linux, não usamos creationflags para DETACHED_PROCESS da mesma forma que Windows
+            # Usamos start_new_session=True para garantir que não feche com o script pai se necessário,
+            # ou simplesmente subprocess.Popen padrão.
             subprocess.Popen(
-                cmd, shell=True, creationflags=0x00000008,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL, close_fds=True
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                close_fds=True,
+                start_new_session=True
             )
             for i in range(20):
                 time.sleep(0.5)
                 if self.is_port_in_use(CHROME_DEBUG_PORT):
                     return True
+        else:
+            self.logger.error("Executável do Chrome não encontrado.")
+
         return False
 
     def conectar_selenium(self):
         self.logger.info("Tentando conectar Selenium ao navegador...")
         opts = Options()
         opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{CHROME_DEBUG_PORT}")
+        # Argumentos adicionais para compatibilidade Linux em ambiente headless/container (se necessário)
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+
         try:
             self.driver = webdriver.Chrome(options=opts)
             # Teste de vida
@@ -635,9 +661,6 @@ class AutomationLogic:
             if not self.driver.execute_script("return arguments[0].checked;", chk):
                 self.click_robusto(chk)
                 self.logger.info("Termo aceito!", extra={'tags': 'SUCCESS'})
-            
-            # REMOVIDO: ctypes.windll.user32.MessageBoxW...
-            # A mensagem de sucesso agora é gerenciada pelo AppController -> UI
             
         except Exception as e:
             self.logger.error(f"Erro Etapa 4: {e}")

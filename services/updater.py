@@ -2,7 +2,6 @@ import os
 import sys
 import requests
 import subprocess
-import ctypes
 from packaging import version
 
 class AutoUpdater:
@@ -17,7 +16,7 @@ class AutoUpdater:
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             
-        self.temp_installer_path = os.path.join(base_dir, "setup_update_temp.exe")
+        self.temp_installer_path = os.path.join(base_dir, "update_package.tmp")
 
     def log(self, msg):
         if self.logger: self.logger.info(f"[UPDATER] {msg}")
@@ -43,14 +42,14 @@ class AutoUpdater:
             return False
 
     def download_and_install(self):
-        """Baixa o instalador e o executa."""
+        """Baixa o pacote de atualização e notifica o usuário."""
         url = self.repo_data.get("url_download")
         if not url: return
 
-        self.log(f"Baixando instalador: {url}")
+        self.log(f"Baixando atualização: {url}")
         
         try:
-            # 1. Download do Instalador
+            # 1. Download do Pacote
             response = requests.get(url, stream=True, timeout=90)
             response.raise_for_status()
             
@@ -58,17 +57,11 @@ class AutoUpdater:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            self.log("Download concluído. Iniciando instalador...")
+            self.log(f"Download concluído em: {self.temp_installer_path}")
+            self.log("Por favor, atualize manualmente conforme as instruções do seu sistema.")
 
-            # 2. Executar o Instalador
-            # Passamos argumentos para tentar fazer uma instalação mais silenciosa ou normal
-            # Se for Inno Setup padrão, ele vai abrir a janela de instalação por cima
-            subprocess.Popen([self.temp_installer_path], shell=True)
-
-            # 3. Fechar o programa atual imediatamente para não bloquear a substituição de arquivos
-            self.log("Encerrando aplicação para permitir atualização...")
-            sys.exit(0)
+            # No Linux, não executamos automaticamente pois varia (deb, rpm, tar.gz, AppImage)
+            # Apenas notificamos (o log será exibido ou capturado)
 
         except Exception as e:
             self.log(f"Erro na atualização: {e}")
-            ctypes.windll.user32.MessageBoxW(0, f"Erro ao baixar atualização:\n{e}", "Erro", 0x10)

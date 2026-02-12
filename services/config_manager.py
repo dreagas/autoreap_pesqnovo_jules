@@ -158,3 +158,19 @@ class ConfigManager:
         if changed:
             self.save()
             print("Configurações atualizadas via nuvem com sucesso.")
+
+    def export_config(self):
+        """Exporta a configuração atual para a pasta Home ou Documentos do usuário."""
+        home = os.path.expanduser("~")
+        docs = os.path.join(home, "Documents")
+        if not os.path.exists(docs):
+            docs = home
+
+        target_path = os.path.join(docs, "autoreap_config.json")
+
+        try:
+            with open(target_path, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, indent=4, ensure_ascii=False)
+            return True, target_path
+        except Exception as e:
+            return False, str(e)

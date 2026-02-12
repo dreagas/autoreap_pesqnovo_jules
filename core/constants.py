@@ -5,9 +5,9 @@ import sys
 #  CONSTANTES GLOBAIS
 # ==============================================================================
 
-VERSION = "1.0.3.0"
+VERSION = "1.0.3.1"
 CHROME_DEBUG_PORT = 9222
-BASE_DIR = r"C:\chrome_reap"
+BASE_DIR = os.path.expanduser("~/chrome_reap")
 CONFIG_FILE = os.path.join(BASE_DIR, "autoreapmpa.json")
 
 def resource_path(relative_path):
@@ -31,12 +31,12 @@ APP_PATH = resource_path("")
 # CAMINHO DAS IMAGENS (Sempre resolvido via resource_path)
 IMG_DIR = resource_path("img")
 
-# Garante que a pasta C:\chrome_reap exista para salvar logs e configs
+# Garante que a pasta chrome_reap exista para salvar logs e configs
 if not os.path.exists(BASE_DIR):
     try: os.makedirs(BASE_DIR)
     except: pass
 
-# Define o arquivo de log fixo dentro de C:\chrome_reap
+# Define o arquivo de log fixo dentro de chrome_reap
 LOG_FILE = os.path.join(BASE_DIR, "reap_debug_log.txt")
 CHROME_PROFILE_PATH = BASE_DIR
 

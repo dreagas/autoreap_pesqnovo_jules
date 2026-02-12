@@ -1,3 +1,5 @@
 pyside6
 selenium
 psutil
+requests
+packaging
