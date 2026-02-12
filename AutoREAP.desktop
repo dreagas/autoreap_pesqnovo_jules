@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AutoREAP v2
+Comment=Automação de Pesca e Sincronização
+Exec=PLACEHOLDER_EXEC
+Icon=PLACEHOLDER_ICON
+Terminal=false
+Categories=Utility;Application;Office;
+StartupNotify=true
