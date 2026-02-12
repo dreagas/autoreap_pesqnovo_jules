@@ -17,14 +17,11 @@ import os
 import subprocess
 
 class MainWindow(QMainWindow):
-    def __init__(self, license_data=None):
+    def __init__(self):
         super().__init__()
         self.setWindowTitle(f"AutoREAPv2 - v{VERSION} [APAPS OFFLINE]")
         self.resize(1100, 750) 
         
-        # Guarda os dados da licença recebidos no boot
-        self.license_data = license_data or {}
-
         # Controller
         self.controller = AppController()
         

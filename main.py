@@ -5,8 +5,6 @@ from PySide6.QtGui import QIcon, QPixmap, QColor
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
 from core.constants import VERSION, IMG_DIR, resource_path, BASE_DIR
-# REMOVIDO: from services.license_manager import LicenseManager
-# REMOVIDO: from services.updater import AutoUpdater
 
 def load_stylesheet(app):
     """
@@ -66,19 +64,8 @@ def main():
     app.processEvents()
     # --------------------------------------------
 
-    # 2. Verificação de Acesso e Atualizações (BYPASSED)
-    # Nesta versão específica APAPS, ignoramos a verificação online e injetamos
-    # dados de licença simulados caso alguma parte do sistema precise.
-
-    # Dados Hardcoded APAPS (Apenas para compatibilidade de assinatura, se houver)
-    license_data = {
-        "status": "ativo",
-        "msg": "Modo Offline APAPS",
-        "perfil_config": {
-            # Os dados reais estão no ConfigManager, aqui é apenas metadado
-            "cliente": "APAPS"
-        }
-    }
+    # 2. Verificação de Acesso e Atualizações (REMOVIDO COMPLETAMENTE)
+    # Versão autônoma sem licença.
 
     # 3. Configurações Visuais
     # Define o ícone da aplicação na janela
@@ -94,8 +81,8 @@ def main():
         splash.showMessage(f"ABRINDO INTERFACE...\n\nAutoREAP v{VERSION}", Qt.AlignCenter | Qt.AlignBottom, QColor("#38BDF8"))
         app.processEvents()
 
-    # Passamos os dados da licença (fake/bypass) para configurar janela
-    window = MainWindow(license_data)
+    # Inicializa MainWindow sem argumentos de licença
+    window = MainWindow()
     window.show()
 
     # Fecha o splash quando a janela principal abrir

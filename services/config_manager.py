@@ -97,13 +97,6 @@ class ConfigManager:
             return self.data.get("municipio_manual", "")
         return sel
 
-    def apply_cloud_overrides(self, license_data):
-        """
-        Nesta versão APAPS Offline, esta função não faz nada ou apenas valida
-        se a licença é compatível, mas os valores padrão já estão hardcoded.
-        """
-        pass
-            
     def export_config(self):
         """Exporta a configuração atual para a pasta Home ou Documentos do usuário."""
         home = os.path.expanduser("~")
