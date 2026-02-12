@@ -1,5 +1,8 @@
-INSTRUÇÕES DE BUILD E DISTRIBUIÇÃO (LINUX)
-=============================================
+AUTOREAP v2 (VERSÃO APAPS OFFLINE LINUX)
+========================================
+
+Esta é uma versão dedicada e offline do AutoREAP configurada especificamente para o perfil APAPS.
+Não requer ativação online nem verificação de licença.
 
 1. BUILD (GERAR O EXECUTÁVEL)
 -----------------------------

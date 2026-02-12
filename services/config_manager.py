@@ -3,10 +3,10 @@ import json
 from core.constants import BASE_DIR, CONFIG_FILE, MESES_DEFESO_PADRAO, MESES_PRODUCAO_PADRAO, TODOS_MESES_ORDENADOS
 
 class ConfigManager:
-    # Configuração Padrão
+    # Configuração Padrão (APAPS - OFFLINE/STANDALONE)
     DEFAULT_CONFIG = {
         # Dados Pessoais / Básicos
-        "municipio_padrao": "Nova Olinda do Maranhão",
+        "municipio_padrao": "Presidente Sarney",
         "municipio_manual": "",
         "uf_residencia": "MARANHAO",
         "categoria": "Artesanal",
@@ -34,23 +34,25 @@ class ConfigManager:
         # Meses Configurados (Controle de Checkboxes da UI)
         "meses_selecionados": TODOS_MESES_ORDENADOS.copy(),
         
-        # Referência de Lógica (Estes definem o comportamento do robô)
-        # Podem ser sobrescritos pelo JSON da nuvem
-        "meses_defeso": MESES_DEFESO_PADRAO,
-        "meses_producao": MESES_PRODUCAO_PADRAO,
+        # Regras de Negócio
+        "meses_defeso": ["Janeiro", "Fevereiro", "Março", "Dezembro"],
+        "meses_producao": ["Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro"],
 
-        # Resultado Anual
+        # Resultado Anual (Catálogo APAPS)
         "catalogo_especies": [
-            {"nome": "Branquinha",                  "preco": 12.00, "kg_base": 21},
-            {"nome": "Mandi",                       "preco": 15.00, "kg_base": 20},
-            {"nome": "Piau",                        "preco": 15.00, "kg_base": 20},
-            {"nome": "Piaba",                       "preco": 12.00, "kg_base": 12},
-            {"nome": "Surubim ou Cachara",          "preco": 18.00, "kg_base": 17},
-            {"nome": "Piau-cabeça-gorda",           "preco": 15.00, "kg_base": 12},
-            {"nome": "Piau-de-vara",                "preco": 17.00, "kg_base": 16},
-            {"nome": "Mandi, Cabeçudo, Mandiguaru", "preco": 16.00, "kg_base": 16}
+            {"nome": "Branquinha", "preco": 12.0, "kg_base": 21},
+            {"nome": "Mandi", "preco": 15.0, "kg_base": 20},
+            {"nome": "Piau", "preco": 15.0, "kg_base": 20},
+            {"nome": "Piaba", "preco": 12.0, "kg_base": 12},
+            {"nome": "Surubim ou Cachara", "preco": 18.0, "kg_base": 17},
+            {"nome": "Piau-cabeça-gorda", "preco": 15.0, "kg_base": 12},
+            {"nome": "Piau-de-vara", "preco": 17.0, "kg_base": 16},
+            {"nome": "Mandi, Cabeçudo, Mandiguaru", "preco": 16.0, "kg_base": 16}
         ]
     }
+
+    # Lista de Municípios Customizada para a UI
+    MUNICIPIOS_CUSTOM = ["Presidente Sarney", "Nova Olinda do Maranhão", "Santa Helena", "Outros"]
 
     def __init__(self):
         self.data = self.load()
@@ -97,68 +99,11 @@ class ConfigManager:
 
     def apply_cloud_overrides(self, license_data):
         """
-        Aplica configurações vindas da nuvem (JSON da Licença).
-        Isso permite personalizar UF, Espécies, Municípios e Regras de Negócio por cliente.
+        Nesta versão APAPS Offline, esta função não faz nada ou apenas valida
+        se a licença é compatível, mas os valores padrão já estão hardcoded.
         """
-        if not license_data:
-            return
-
-        # 1. Busca perfil de configuração no JSON
-        perfil = license_data.get("perfil_config", {})
-        if not perfil:
-            return
-
-        print("Aplicando perfil de configuração da nuvem...")
-        changed = False
-
-        # Lista MESTRA de chaves permitidas para sobrescrever (Cobre sua solicitação completa)
-        keys_to_override = [
-            # 1. Localização e Dados Básicos
-            "uf_residencia", 
-            "municipio_padrao", 
-            "municipio_manual",
-            "categoria", 
-            "forma_atuacao",
+        pass
             
-            # 2. Detalhes da Atividade
-            "relacao_trabalho", 
-            "estado_comercializacao",
-            "grupos_alvo", 
-            "compradores",
-            
-            # 3. Regras de Tempo (Meses de realização e não realização)
-            "meses_defeso",   # Meses de não realização
-            "meses_producao", # Meses de realização
-            "dias_min", 
-            "dias_max",
-            
-            # 4. Local Específico da Pesca
-            "local_pesca_tipo", 
-            "uf_pesca", 
-            "nome_local_pesca",
-            "metodos_pesca", # Petrecho
-            
-            # 5. Resultado Anual (Espécies e Valores)
-            "catalogo_especies", 
-            "meta_financeira_min", 
-            "meta_financeira_max", 
-            "variacao_peso_pct"
-        ]
-
-        for key in keys_to_override:
-            if key in perfil:
-                # Verifica se o valor é diferente para evitar escritas desnecessárias,
-                # mas garante que a nuvem tem autoridade sobre o local.
-                # Para listas (como catalogo_especies), a comparação direta funciona bem em Python.
-                if self.data.get(key) != perfil[key]:
-                    self.data[key] = perfil[key]
-                    changed = True
-        
-        # Salva se houve mudança para persistir nas próximas aberturas
-        if changed:
-            self.save()
-            print("Configurações atualizadas via nuvem com sucesso.")
-
     def export_config(self):
         """Exporta a configuração atual para a pasta Home ou Documentos do usuário."""
         home = os.path.expanduser("~")

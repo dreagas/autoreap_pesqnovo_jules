@@ -10,7 +10,7 @@ from ui.controllers.app_controller import AppController
 from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
 from ui.dialogs.month_selector import MonthSelectorDialog
 from ui.dialogs.simulation_dialog import SimulationDialog
-from services.license_manager import LicenseManager
+from services.config_manager import ConfigManager # Importar diretamente para pegar constantes
 from core.constants import VERSION, LOG_FILE, IMG_DIR
 
 import os
@@ -19,7 +19,7 @@ import subprocess
 class MainWindow(QMainWindow):
     def __init__(self, license_data=None):
         super().__init__()
-        self.setWindowTitle(f"AutoREAPv2 - v{VERSION}")
+        self.setWindowTitle(f"AutoREAPv2 - v{VERSION} [APAPS OFFLINE]")
         self.resize(1100, 750) 
         
         # Guarda os dados da licença recebidos no boot
@@ -28,11 +28,9 @@ class MainWindow(QMainWindow):
         # Controller
         self.controller = AppController()
         
-        # --- INJEÇÃO AUTOMÁTICA (BOOT) ---
-        # Se a licença tiver um perfil personalizado, aplica agora antes de criar a UI
-        if self.license_data:
-            self.controller.config_manager.apply_cloud_overrides(self.license_data)
-        # ---------------------------------
+        # --- MODO OFFLINE: Não aplica cloud overrides dinamicamente ---
+        # As configs já estão no ConfigManager.DEFAULT_CONFIG
+        # ----------------------------------------------------------
 
         self.connect_signals()
 
@@ -210,15 +208,8 @@ class MainWindow(QMainWindow):
 
         self.combo_mun = NoWheelComboBox()
         
-        # Carrega lista inicial
-        lista_municipios = ["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"]
-        if self.license_data and "perfil_config" in self.license_data:
-            custom = self.license_data["perfil_config"].get("municipios_custom")
-            if isinstance(custom, list) and len(custom) > 0:
-                lista_municipios = custom
-                if "Outros" not in lista_municipios:
-                    lista_municipios.append("Outros")
-
+        # Carrega lista do ConfigManager (Estática APAPS)
+        lista_municipios = ConfigManager.MUNICIPIOS_CUSTOM
         self.combo_mun.addItems(lista_municipios)
         self.combo_mun.currentTextChanged.connect(self.on_municipio_change)
 
@@ -304,28 +295,18 @@ class MainWindow(QMainWindow):
         self.checkbox_groups = {}
         self.species_rows = []
 
-        # --- BOTÃO DE SINCRONIZAÇÃO NUVEM ---
-        cloud_frame = QFrame()
-        cloud_frame.setObjectName("Card")
-        cloud_layout = QHBoxLayout(cloud_frame)
-        cloud_layout.setContentsMargins(15, 15, 15, 15)
+        # --- AVISO MODO OFFLINE ---
+        # Removido botão de nuvem, adicionado aviso simples
+        offline_frame = QFrame()
+        offline_frame.setObjectName("Card")
+        offline_layout = QHBoxLayout(offline_frame)
+        offline_layout.setContentsMargins(15, 10, 15, 10)
         
-        self.btn_cloud_sync = QPushButton(" BAIXAR MINHAS CONFIGURAÇÕES DA MINHA LICENÇA DA NUVEM")
-        self.btn_cloud_sync.setObjectName("BoldButton")
-        # Ícone de Nuvem (img_nuvem.png)
-        icon_path = os.path.join(IMG_DIR, "img_nuvem.png")
-        if os.path.exists(icon_path):
-            self.btn_cloud_sync.setIcon(QIcon(icon_path))
-            self.btn_cloud_sync.setIconSize(QSize(24, 24))
+        lbl_offline = QLabel("⚠️ MODO OFFLINE APAPS - CONFIGURAÇÕES FIXAS")
+        lbl_offline.setStyleSheet("color: #FACC15; font-weight: bold; font-size: 13px; background: transparent;")
+        offline_layout.addWidget(lbl_offline)
         
-        self.btn_cloud_sync.setStyleSheet("""
-            QPushButton { background-color: #0284C7; border: 1px solid #0369A1; font-size: 13px; color: white; font-weight: bold; border-radius: 8px; min-height: 40px; }
-            QPushButton:hover { background-color: #0369A1; }
-        """)
-        self.btn_cloud_sync.clicked.connect(self.download_cloud_config)
-        cloud_layout.addWidget(self.btn_cloud_sync)
-        
-        self.cfg_layout.addWidget(cloud_frame)
+        self.cfg_layout.addWidget(offline_frame)
         # ------------------------------------
 
         def create_section_container(title):
@@ -486,7 +467,7 @@ class MainWindow(QMainWindow):
         btn_save_all.clicked.connect(self.save_full_config)
         bottom_btns_layout.addWidget(btn_save_all)
 
-        # REDEFINIR
+        # REDEFINIR (LOCAL APENAS)
         btn_reset = QPushButton(" REDEFINIR")
         btn_reset.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_restaurar.png")
@@ -503,34 +484,6 @@ class MainWindow(QMainWindow):
         scroll.setWidget(content)
         main_tab_layout.addWidget(scroll)
 
-    def download_cloud_config(self):
-        """Baixa as configurações da nuvem manualmente e atualiza a UI."""
-        mgr = LicenseManager()
-        self.lbl_status.setText("Status: Conectando à nuvem...")
-        self.btn_cloud_sync.setEnabled(False)
-        self.btn_cloud_sync.setText(" BUSCANDO...")
-        QApplication.processEvents()
-
-        try:
-            valido, msg, data = mgr.validate()
-            if valido and data:
-                # 1. Aplica no Manager
-                self.controller.config_manager.apply_cloud_overrides(data)
-                # 2. Atualiza memória local da Window (importante para lista de municípios custom)
-                self.license_data = data 
-                # 3. Recarrega os campos visuais
-                self.refresh_config_tab() 
-                
-                ModernMessageBox("SUCESSO", "Configurações sincronizadas com a nuvem!\n\nOs campos foram atualizados conforme sua licença.", "SUCCESS", self).exec()
-            else:
-                ModernMessageBox("ERRO", f"Não foi possível baixar as configurações:\n{msg}", "ERROR", self).exec()
-        except Exception as e:
-            ModernMessageBox("ERRO CRÍTICO", f"Erro ao conectar: {e}", "ERROR", self).exec()
-        finally:
-            self.btn_cloud_sync.setEnabled(True)
-            self.btn_cloud_sync.setText(" BAIXAR MINHAS CONFIGURAÇÕES DA MINHA LICENÇA DA NUVEM")
-            self.lbl_status.setText(f"Status: Pronto")
-
     def export_config(self):
         """Exporta a configuração para JSON."""
         ok, path = self.controller.config_manager.export_config()
@@ -540,15 +493,13 @@ class MainWindow(QMainWindow):
              ModernMessageBox("ERRO", f"Falha ao exportar:\n{path}", "ERROR", self).exec()
 
     def reset_and_sync(self):
-        """Redefine para padrões e busca atualização da nuvem."""
-        dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações locais, restaurará os padrões E buscará a última versão da nuvem.", "WARNING", self)
+        """Redefine para padrões (versão offline - reseta para hardcoded)."""
+        dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações locais e restaurará os padrões originais do APAPS.", "WARNING", self)
         dlg.btn_ok.setText("SIM, REDEFINIR")
         if dlg.exec():
             # 1. Reseta para hardcoded defaults
             self.controller.config_manager.reset_to_defaults()
-            # 2. Tenta baixar e aplicar override da nuvem
-            self.download_cloud_config()
-            # 3. Atualiza UI (já feito pelo download_cloud_config, mas se falhar lá, o reset já foi feito)
+            # 2. Atualiza UI
             self.refresh_config_tab()
 
     def reload_species_widgets(self):
@@ -688,18 +639,9 @@ class MainWindow(QMainWindow):
         
         self.reload_species_widgets()
         
-        # Atualiza a lista de municípios com base na licença atual
+        # Atualiza a lista de municípios com base na CONSTANTE APAPS
         self.combo_mun.clear()
-        lista_municipios = ["Nova Olinda do Maranhão", "Presidente Sarney", "Outros"]
-        
-        # Tenta pegar lista customizada da memória da licença
-        if self.license_data and "perfil_config" in self.license_data:
-             custom = self.license_data["perfil_config"].get("municipios_custom")
-             if custom and isinstance(custom, list):
-                 lista_municipios = custom
-                 if "Outros" not in lista_municipios:
-                     lista_municipios.append("Outros")
-                     
+        lista_municipios = ConfigManager.MUNICIPIOS_CUSTOM
         self.combo_mun.addItems(lista_municipios)
 
         mun = self.controller.config_manager.data.get("municipio_padrao")
