@@ -11,14 +11,6 @@ class AutoUpdater:
         self.repo_data = repo_data
         self.logger = app_logger
         
-        # Define onde salvar o instalador temporário
-        if getattr(sys, 'frozen', False):
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            
-        self.temp_installer_path = os.path.join(base_dir, "setup_update_temp.exe")
-
     def log(self, msg):
         if self.logger: self.logger.info(f"[UPDATER] {msg}")
         else: print(f"[UPDATER] {msg}")
@@ -42,30 +34,28 @@ class AutoUpdater:
             self.log(f"Erro ao comparar versões: {e}")
             return False
 
-    def download_and_install(self):
-        """Baixa o instalador e o executa."""
+    def download_and_install(self, target_path):
+        """Baixa o instalador no caminho especificado e o executa."""
         url = self.repo_data.get("url_download")
         if not url: return
 
-        self.log(f"Baixando instalador: {url}")
+        self.log(f"Baixando instalador: {url} -> {target_path}")
         
         try:
             # 1. Download do Instalador
             response = requests.get(url, stream=True, timeout=90)
             response.raise_for_status()
             
-            with open(self.temp_installer_path, 'wb') as f:
+            with open(target_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
             self.log("Download concluído. Iniciando instalador...")
 
             # 2. Executar o Instalador
-            # Passamos argumentos para tentar fazer uma instalação mais silenciosa ou normal
-            # Se for Inno Setup padrão, ele vai abrir a janela de instalação por cima
-            subprocess.Popen([self.temp_installer_path], shell=True)
+            subprocess.Popen([target_path], shell=True)
 
-            # 3. Fechar o programa atual imediatamente para não bloquear a substituição de arquivos
+            # 3. Fechar o programa atual imediatamente
             self.log("Encerrando aplicação para permitir atualização...")
             sys.exit(0)
 
