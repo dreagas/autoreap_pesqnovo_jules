@@ -1,7 +1,7 @@
 import sys
 import os
 import ctypes
-from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen
+from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen, QFileDialog
 from PySide6.QtGui import QIcon, QPixmap, QColor, QPainter, QPainterPath
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
@@ -61,13 +61,28 @@ def check_license_and_updates(splash=None):
                     # MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST
                     resp = ctypes.windll.user32.MessageBoxW(
                         0, 
-                        f"Uma nova versão ({remote_data.get('versao')}) está disponível!\n\nDeseja atualizar agora?", 
+                        f"Uma nova versão ({remote_data.get('versao')}) está disponível!\n\nDeseja baixar a atualização agora?",
                         "Atualização Disponível", 
                         0x04 | 0x40 | 0x1000 
                     )
                     if resp == 6: # Botão 'Sim'
-                        updater.download_and_install()
-                        # Se o update for iniciado, o programa fecha-se dentro da função
+                        # Solicitar ao usuário onde salvar o instalador
+                        # O splash pode interferir, então ocultamos momentaneamente se estiver visível
+                        if splash: splash.hide()
+
+                        # Precisamos de um widget pai para o QFileDialog, usamos o activeWindow ou None
+                        # Como a MainWindow ainda não existe, usamos None ou criamos um QWidget temporário se necessário.
+                        # QFileDialog estático funciona bem com parent=None
+
+                        default_name = f"setup_autoreap_v{remote_data.get('versao')}.exe"
+                        save_path, _ = QFileDialog.getSaveFileName(None, "Salvar Atualização", default_name, "Executáveis (*.exe)")
+
+                        if save_path:
+                            updater.download_and_install(save_path)
+                            # Se o update for iniciado com sucesso, o programa fecha-se dentro da função
+
+                        # Se cancelou o salvamento, restaura o splash e continua
+                        if splash: splash.show()
             
             return True, remote_data
         
