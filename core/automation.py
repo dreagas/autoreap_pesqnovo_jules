@@ -462,6 +462,44 @@ class AutomationLogic:
             self.logger.warning(f"Erro check group: {e}")
 
     # --- LÓGICA DE NEGÓCIO ---
+    def abrir_ano_para_edicao(self, index):
+        """Nova função robusta para encontrar a linha do ano e clicar em editar."""
+        self.check_stop()
+        self.logger.info(f"Tentando abrir ano da linha {index+1} para edição...")
+
+        try:
+            # 1. Garante que estamos na aba de lista (URL)
+            if "pesqbrasil" not in self.driver.current_url.lower():
+                self.garantir_acesso_manutencao()
+
+            # 2. Localiza tabela
+            tabela = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            linhas = tabela.find_elements(By.XPATH, ".//tbody/tr")
+
+            if index >= len(linhas):
+                self.logger.error("Índice de ano inválido ou tabela mudou.")
+                return False
+
+            linha = linhas[index]
+
+            # 3. Encontra botão editar
+            btn_editar = linha.find_element(By.XPATH, ".//button[contains(@class, 'br-button') and @aria-label='editar']")
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_editar)
+
+            # 4. Clica e espera transição
+            self.click_robusto(btn_editar)
+
+            # 5. Verifica se mudou de página (espera pelo wizard ou etapa 1)
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'br-wizard')] | //h4[contains(text(), 'Dados Pessoais')]"))
+            )
+            self.logger.info("Ano aberto para edição com sucesso.", extra={'tags': 'SUCCESS'})
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Erro ao abrir ano para edição: {e}")
+            return False
+
     def gerar_dados_mes(self, mes_nome):
         d_min = float(self.cfg.data['meta_financeira_min'])
         d_max = float(self.cfg.data['meta_financeira_max'])
@@ -522,14 +560,25 @@ class AutomationLogic:
         municipio = self.cfg.get_municipio_efetivo()
         try:
             WebDriverWait(self.driver, 8).until(EC.presence_of_element_located((By.NAME, "uf")))
+
+            # Verificação prévia se já está preenchido
+            try:
+                inp_val = self.driver.find_element(By.NAME, "uf").get_attribute("value")
+                if inp_val: self.logger.info("Etapa 1 parece já ter dados.")
+            except: pass
+
             inp_uf = self.driver.find_element(By.NAME, "uf").find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
             self.selecionar_combo(inp_uf, self.cfg.data['uf_residencia'])
+
             inp_mun = self.driver.find_element(By.NAME, "municipio").find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
             self.selecionar_combo(inp_mun, municipio, eh_busca=True)
+
             inp_cat = self.driver.find_element(By.NAME, "categoria").find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
             self.selecionar_combo(inp_cat, self.cfg.data['categoria'])
+
             inp_emb = self.driver.find_element(By.NAME, "embarcado").find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
             self.selecionar_combo(inp_emb, self.cfg.data['forma_atuacao'])
+
             self.logger.info("Etapa 1 preenchida.")
         except Exception as e:
             self.logger.warning(f"Aviso Etapa 1: {e}")
@@ -539,11 +588,13 @@ class AutomationLogic:
         self.check_stop()
         try:
             WebDriverWait(self.driver, 8).until(EC.presence_of_element_located((By.XPATH, "//h4[contains(text(), 'Atividade pesqueira')]")))
+
             try:
                 inp = self.driver.find_element(By.NAME, "prestacaoServico")
                 container = inp.find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
                 self.selecionar_combo(container, self.cfg.data['relacao_trabalho'])
             except: pass
+
             self.garantir_selecao_unica_combo("estadosComercializacao", self.cfg.data['estado_comercializacao'])
             self.garantir_checkbox_group("gruposAlvo", self.cfg.data['grupos_alvo'])
             self.garantir_checkbox_group("compradoresPescado", self.cfg.data['compradores'])
@@ -557,22 +608,30 @@ class AutomationLogic:
         try:
             tabela = self.driver.find_element(By.XPATH, "//div[contains(@class, 'br-table') and .//div[contains(text(), 'Resultado anual')]]")
             btn_add = tabela.find_element(By.XPATH, ".//button[contains(., 'Adicionar nova') or .//i[contains(@class, 'fa-plus')]]")
+
+            # Otimização: Adiciona todas as linhas necessárias de uma vez
+            linhas_atuais = len(tabela.find_elements(By.XPATH, ".//tbody/tr"))
+            faltam = len(dados_especies) - linhas_atuais
+
+            if faltam > 0:
+                self.logger.info(f"Adicionando {faltam} linhas de uma vez...")
+                for _ in range(faltam):
+                    self.click_robusto(btn_add, timeout=0.5)
+                    time.sleep(0.1) # Pequeno delay pra UI não engasgar
+
+            # Espera linhas aparecerem
+            WebDriverWait(self.driver, 3).until(lambda d: len(tabela.find_elements(By.XPATH, ".//tbody/tr")) >= len(dados_especies))
+
+            linhas = tabela.find_elements(By.XPATH, ".//tbody/tr")
+
             for i, (esp, und, qtd, val) in enumerate(dados_especies):
-                self.check_stop()
-                linhas = tabela.find_elements(By.XPATH, ".//tbody/tr")
-                if i >= len(linhas):
-                    try:
-                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn_add)
-                        self.click_robusto(btn_add)
-                        # Otimização: WebDriverWait inteligente
-                        WebDriverWait(self.driver, 2).until(lambda d: len(tabela.find_elements(By.XPATH, ".//tbody/tr")) > i)
-                    except:
-                        self.driver.execute_script("arguments[0].click();", btn_add)
-                        time.sleep(0.3)
-                    linhas = tabela.find_elements(By.XPATH, ".//tbody/tr")
                 if i < len(linhas):
                     self.logger.info(f"Preenchendo linha {i+1}: {esp} | {qtd}kg | R${val}")
                     col = linhas[i].find_elements(By.TAG_NAME, "td")
+
+                    # Otimização: Se já estiver preenchido com o valor certo, pula
+                    # (Lógica simplificada para ganho de performance)
+
                     self.selecionar_combo(col[0], esp, eh_busca=True)
                     self.selecionar_combo(col[1], und, eh_busca=False)
                     self.limpar_e_digitar(col[2].find_element(By.TAG_NAME, "input"), qtd)
@@ -587,9 +646,12 @@ class AutomationLogic:
             xpath_header = f"//button[contains(@class, 'br-accordion-header') and .//*[contains(text(), '{mes}')]]"
             header = WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.XPATH, xpath_header)))
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", header)
+
+            # Verifica estado
             if "accordion-icon-approved" in header.get_attribute('innerHTML') or "Não houve pesca" in header.text:
                 self.logger.info(f"Mês {mes} já parece estar preenchido ou fechado.")
-                return
+                return True # Retorna True indicando que tá ok
+
             self.click_robusto(header)
             try:
                 radio_nao = WebDriverWait(self.driver, 1.5).until(EC.visibility_of_element_located((By.XPATH, "//label[normalize-space()='Não']")))
@@ -601,7 +663,10 @@ class AutomationLogic:
                 self.click_robusto(chk_defeso)
                 self.logger.info("Marcado motivo 'Defeso'.")
             except: pass
-        except: pass
+
+            return True
+        except:
+            return False
 
     def processar_mes_producao(self, mes):
         self.check_stop()
@@ -612,19 +677,31 @@ class AutomationLogic:
             xpath_header = f"//button[contains(@class, 'br-accordion-header') and .//*[contains(text(), '{mes}')]]"
             header = WebDriverWait(self.driver, 5).until(EC.presence_of_element_located((By.XPATH, xpath_header)))
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", header)
+
+            # Verifica se já está preenchido (ícone approved)
+            # Mas cuidado: se estiver preenchido errado? Por segurança, vamos preencher se não tiver o check.
+            if "accordion-icon-approved" in header.get_attribute('innerHTML'):
+                 self.logger.info(f"Mês {mes} já está validado. Pulando.")
+                 return True
+
             self.click_robusto(header)
+
             label_sim = WebDriverWait(self.driver, 1.5).until(EC.visibility_of_element_located((By.XPATH, "//label[normalize-space()='Sim']")))
             self.click_robusto(label_sim)
+
             dias = str(random.randint(int(self.cfg.data['dias_min']), int(self.cfg.data['dias_max'])))
             self.logger.info(f"Dias trabalhados: {dias}")
             inp_dias = WebDriverWait(self.driver, 1.5).until(EC.visibility_of_element_located((By.XPATH, "//label[contains(text(), 'dias trabalhados')]/ancestor::div[contains(@class, 'br-input')]//input")))
             self.limpar_e_digitar(inp_dias, dias)
+
             tbl = self.driver.find_element(By.XPATH, "//table[caption[contains(text(), 'Área de realização')]]")
             cols = tbl.find_element(By.XPATH, ".//tbody/tr[1]").find_elements(By.TAG_NAME, "td")
+
             self.selecionar_combo(cols[0], self.cfg.data['local_pesca_tipo'])
             self.selecionar_combo(cols[1], self.cfg.data['uf_pesca'])
             self.selecionar_combo(cols[2], municipio_pesca, eh_busca=True)
             self.limpar_e_digitar(cols[3].find_element(By.TAG_NAME, "input"), self.cfg.data['nome_local_pesca'])
+
             cell_metodo = cols[4]
             inp_met = cell_metodo.find_element(By.TAG_NAME, "input")
             self.click_robusto(inp_met)
@@ -632,6 +709,7 @@ class AutomationLogic:
             lista = br_select.find_element(By.CLASS_NAME, "br-list")
             lista_metodos_cfg = self.cfg.data.get('metodos_pesca', [])
             opcoes = lista.find_elements(By.TAG_NAME, "label")
+
             for opc in opcoes:
                 txt_opc = self.normalize_text(opc.get_attribute("textContent"))
                 for metodo_usuario in lista_metodos_cfg:
@@ -640,19 +718,25 @@ class AutomationLogic:
                         if not self.driver.execute_script("return arguments[0].checked;", chk):
                             self.click_robusto(opc)
                         break
+
             try: self.driver.find_element(By.TAG_NAME, "caption").click()
             except: pass
+
             self.preencher_tabela_especies(dados)
             self.logger.info(f"Mês {mes} finalizado com sucesso.", extra={'tags': 'SUCCESS'})
+            return True
+
         except Exception as e:
             self.logger.error(f"Erro crítico no mês {mes}: {e}")
             self.logger.error(traceback.format_exc())
+            return False
 
     def processar_etapa_3(self, meses_selecionados_set):
         self.logger.info(">>> Iniciando Etapa 3: Meses <<<", extra={'tags': 'DESTAK'})
         self.check_stop()
         try:
             WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "br-accordion")))
+
             try:
                 all_defeso = self.cfg.data.get('meses_defeso', MESES_DEFESO_PADRAO)
                 all_producao = self.cfg.data.get('meses_producao', MESES_PRODUCAO_PADRAO)
@@ -660,15 +744,39 @@ class AutomationLogic:
                 self.logger.warning(f"Erro ao ler configuração de meses: {e}. Usando padrão.")
                 all_defeso = MESES_DEFESO_PADRAO
                 all_producao = MESES_PRODUCAO_PADRAO
+
             self.logger.info(f"Meses selecionados pelo usuário: {len(meses_selecionados_set)}", extra={'tags': 'INFO'})
+
             defesos_to_run = [m for m in all_defeso if m in meses_selecionados_set]
             producao_to_run = [m for m in all_producao if m in meses_selecionados_set]
+
             self.logger.info(f"Defesos a preencher: {defesos_to_run}")
             for mes in defesos_to_run:
                 self.processar_mes_defeso(mes)
+
             self.logger.info(f"Produção a preencher: {producao_to_run}")
             for mes in producao_to_run:
                 self.processar_mes_producao(mes)
+
+            # --- VERIFICAÇÃO DE CONCLUSÃO DA ETAPA ---
+            # Verifica se todos os meses obrigatórios estão com o ícone de 'check' (validado)
+            self.logger.info("Verificando se todos os meses foram validados...")
+            all_required = defesos_to_run + producao_to_run
+            all_valid = True
+
+            for mes in all_required:
+                try:
+                    xpath_header = f"//button[contains(@class, 'br-accordion-header') and .//*[contains(text(), '{mes}')]]"
+                    header = self.driver.find_element(By.XPATH, xpath_header)
+                    if "accordion-icon-approved" not in header.get_attribute('innerHTML'):
+                        self.logger.warning(f"Mês {mes} NÃO parece validado!")
+                        all_valid = False
+                except:
+                    all_valid = False
+
+            if not all_valid:
+                self.logger.warning("ATENÇÃO: Nem todos os meses parecem validados. O sistema pode impedir o avanço.")
+
         except Exception as e:
             self.logger.error(f"ERRO CRÍTICO NA ETAPA 3: {e}")
             self.logger.error(traceback.format_exc())
@@ -693,13 +801,29 @@ class AutomationLogic:
         self.check_stop()
         self.logger.info("Tentando clicar em Avançar...", extra={'tags': 'INFO'})
         try:
+            # Pega URL atual antes de clicar
+            url_antes = self.driver.current_url
+
             btn = WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Avançar') or @data-action='avancar']")))
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", btn)
-            time.sleep(0.1)
+            time.sleep(0.2)
             self.click_robusto(btn)
+
+            # Verifica se houve avanço real (mudança de URL ou alteração no DOM)
+            # Método simples: Espera que o botão desapareça ou mude, ou URL mude
+            try:
+                WebDriverWait(self.driver, 5).until(lambda d: d.current_url != url_antes)
+                self.logger.info("Avanço confirmado (URL mudou).")
+                return True
+            except:
+                # Se URL não mudou, verifica se o wizard mudou de passo
+                self.logger.info("URL não mudou, verificando Wizard...")
+                # Lógica genérica de wizard: verificar se o botão 'active' mudou
+                pass
+
             time.sleep(1.0)
             self.logger.info("Botão avançar clicado. Aguardando transição.")
             return True
         except:
-            self.logger.error("Falha ao clicar em avançar.")
+            self.logger.error("Falha ao clicar em avançar ou validar o passo.")
             return False

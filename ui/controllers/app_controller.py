@@ -243,16 +243,10 @@ class AppController(QObject):
                 self.automation.trazer_navegador_frente()
 
             try:
-                driver = self.automation.driver
-                linhas = driver.find_elements(By.XPATH, "//table/tbody/tr")
-                if index >= len(linhas):
-                    self.logger.error("Tabela mudou.")
+                # NOVA LÓGICA DE ABERTURA ROBUSTA
+                if not self.automation.abrir_ano_para_edicao(index):
+                    self.execution_error.emit("Falha ao abrir o ano para edição.")
                     return
-
-                row = linhas[index]
-                btn = row.find_element(By.XPATH, ".//button[contains(@class, 'br-button') and @aria-label='editar']")
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-                btn.click()
 
                 self.automation.processar_etapa_1()
                 if self.automation.avancar():
