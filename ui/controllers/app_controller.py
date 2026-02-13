@@ -2,7 +2,7 @@ from PySide6.QtCore import QObject, Signal, QThread, QTimer
 from core.automation import AutomationLogic
 from services.config_manager import ConfigManager
 from services.logger import setup_logging
-from core.constants import LOG_FILE, VERSION, TODOS_MESES_ORDENADOS
+from core.constants import LOG_FILE, VERSION, TODOS_MESES_ORDENADOS, BROWSER_CHROME, BROWSER_EDGE
 import threading
 import queue
 import time
@@ -34,6 +34,7 @@ class AppController(QObject):
     # NOVOS SINAIS PARA POPUPS UI
     request_login = Signal() # Solicita que a UI mostre o popup de login
     show_success_popup = Signal(str, str) # Titulo, Mensagem
+    update_browser_btn = Signal(str, str) # Signal to update Connect button (text, icon_name)
 
     def __init__(self):
         super().__init__()
@@ -69,15 +70,30 @@ class AppController(QObject):
         """Chamado pela UI quando o usuário clica em OK no popup de login"""
         self.login_confirmed_event.set()
 
+    def update_browser_ui(self):
+        """Emits signal to update UI based on browser config"""
+        browser = self.config_manager.data.get("navegador_padrao", BROWSER_CHROME)
+        if browser == BROWSER_EDGE:
+            self.update_browser_btn.emit(" CONECTAR EDGE", "img_edge.png")
+        else:
+            self.update_browser_btn.emit(" CONECTAR CHROME", "img_chrome.png")
+
     def start_browser(self):
         self.stop_event.clear()
         self.login_confirmed_event.clear()
-        self.status_signal.emit("Conectando Chrome...", "white")
+
+        # Determine browser type
+        browser_type = self.config_manager.data.get("navegador_padrao", BROWSER_CHROME)
+        self.update_browser_ui()
+
+        self.status_signal.emit(f"Conectando {browser_type.capitalize()}...", "white")
 
         def boot_task():
             self.logger.info("INICIANDO SISTEMA...", extra={'tags': 'DESTAK'})
-            self.automation = AutomationLogic(self.logger, self.stop_event, self.config_manager)
-            sucesso = self.automation.garantir_chrome_aberto()
+
+            # Passa o tipo de navegador para a automação
+            self.automation = AutomationLogic(self.logger, self.stop_event, self.config_manager, browser_type)
+            sucesso = self.automation.garantir_navegador_aberto()
             if not sucesso:
                 self.logger.error("Falha crítica ao abrir navegador.")
                 self.execution_error.emit("Falha crítica ao abrir navegador.")
@@ -105,6 +121,7 @@ class AppController(QObject):
     def stop_automation(self):
         self.stop_event.set()
         self.logger.error(">>> PARANDO... <<<", extra={'tags': 'ERROR'})
+
         # Forçar parada do Selenium
         if self.automation and self.automation.driver:
             try:

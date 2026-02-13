@@ -1,17 +1,18 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTabWidget, QScrollArea, QFrame, QLineEdit, QTextEdit, QMessageBox,
-    QGridLayout, QGroupBox, QCheckBox, QApplication, QSizePolicy, QSpacerItem
+    QTabWidget, QScrollArea, QFrame, QLineEdit, QTextEdit,
+    QGridLayout, QGroupBox, QCheckBox, QApplication,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, Slot, QSize, QTimer
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon
 
 from ui.controllers.app_controller import AppController
 from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
 from ui.dialogs.month_selector import MonthSelectorDialog
 from ui.dialogs.simulation_dialog import SimulationDialog
 from services.license_manager import LicenseManager
-from core.constants import VERSION, LOG_FILE, IMG_DIR
+from core.constants import VERSION, LOG_FILE, IMG_DIR, BROWSER_CHROME, BROWSER_EDGE
 
 import os
 
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
         self.controller.execution_error.connect(self.on_execution_error)
         self.controller.request_login.connect(self.show_login_popup)
         self.controller.show_success_popup.connect(self.show_success_message)
+        self.controller.update_browser_btn.connect(self.update_connect_button)
 
     def create_sidebar(self):
         sidebar = QFrame()
@@ -109,6 +111,7 @@ class MainWindow(QMainWindow):
             return btn
 
         # Sidebar Buttons
+        # Texto e ícone padrão (Chrome), será atualizado pelo controller se necessário
         self.btn_reconnect = create_btn(" CONECTAR CHROME", "img_chrome.png", obj_name="BoldButton")
         self.btn_reconnect.clicked.connect(self.controller.start_browser)
         layout.addWidget(self.btn_reconnect)
@@ -385,6 +388,11 @@ class MainWindow(QMainWindow):
             parent_layout.addWidget(group)
 
         # Config Sections
+        # Section 0: Navegador
+        s0_frame, s0_layout, s0_grid = create_section_container("PREFERÊNCIA DE NAVEGADOR")
+        add_field(s0_grid, 0, "Navegador Padrão:", "navegador_padrao", "option", [BROWSER_CHROME, BROWSER_EDGE])
+        self.cfg_layout.addWidget(s0_frame)
+
         s1_frame, s1_layout, s1_grid = create_section_container("DADOS PESSOAIS / BÁSICOS")
         r = 0
         estados_br = ["ACRE", "ALAGOAS", "AMAPA", "AMAZONAS", "BAHIA", "CEARA", "DISTRITO FEDERAL", "ESPIRITO SANTO", "GOIAS", "MARANHAO", "MATO GROSSO", "MATO GROSSO DO SUL", "MINAS GERAIS", "PARA", "PARAIBA", "PARANA", "PERNAMBUCO", "PIAUI", "RIO DE JANEIRO", "RIO GRANDE DO NORTE", "RIO GRANDE DO SUL", "RONDONIA", "RORAIMA", "SANTA CATARINA", "SAO PAULO", "SERGIPE", "TOCANTINS"]
@@ -462,6 +470,17 @@ class MainWindow(QMainWindow):
         self.cfg_layout.addSpacing(20)
 
         # --- REVERTENDO PARA BOTÕES DIRETAMENTE NO LAYOUT (SEM CARD/FRAME ESCURO) ---
+
+        # Botão Exportar
+        btn_export = QPushButton(" EXPORTAR CONFIGURAÇÕES")
+        btn_export.setObjectName("BoldButton")
+        icon_path = os.path.join(IMG_DIR, "img_exportar.png")
+        if os.path.exists(icon_path):
+            btn_export.setIcon(QIcon(icon_path))
+            btn_export.setIconSize(QSize(24, 24))
+        btn_export.clicked.connect(self.export_config_file)
+        self.cfg_layout.addWidget(btn_export)
+
         btn_save_all = QPushButton(" SALVAR TODAS AS CONFIGURAÇÕES")
         btn_save_all.setObjectName("BoldButton") 
         icon_path = os.path.join(IMG_DIR, "img_salvar.png")
@@ -567,12 +586,20 @@ class MainWindow(QMainWindow):
     # SLOT PARA AVISO DE PARADA ATUALIZADO
     def on_stop_clicked(self):
         self.controller.stop_automation()
+        browser_type = self.controller.config_manager.data.get("navegador_padrao", BROWSER_CHROME).capitalize()
         ModernMessageBox(
             "PARADO", 
-            "Automação interrompida com sucesso.\n\nPara continuar, é necessário reiniciar a conexão utilizando a opção 'CONECTAR CHROME' no menu.", 
+            f"O programa foi interrompido. Agora você pode realizar o login ou navegar manualmente.\n\nPara retomar a automação, será necessário clicar em Conectar {browser_type} novamente.",
             "WARNING", 
             self
         ).exec()
+
+    @Slot(str, str)
+    def update_connect_button(self, text, icon_name):
+        self.btn_reconnect.setText(text)
+        icon_path = os.path.join(IMG_DIR, icon_name)
+        if os.path.exists(icon_path):
+            self.btn_reconnect.setIcon(QIcon(icon_path))
 
     def save_municipio_pref(self):
         val = self.combo_mun.currentText()
@@ -581,6 +608,15 @@ class MainWindow(QMainWindow):
         self.controller.config_manager.data["municipio_manual"] = manual
         self.controller.config_manager.save()
         ModernMessageBox("SUCESSO", "Preferência de município salva!", "SUCCESS", self).exec()
+
+    def export_config_file(self):
+        default_name = f"config_reap_backup.json"
+        path, _ = QFileDialog.getSaveFileName(self, "Exportar Configurações", default_name, "JSON Files (*.json)")
+        if path:
+            if self.controller.config_manager.export_config(path):
+                ModernMessageBox("SUCESSO", f"Configurações exportadas para:\n{path}", "SUCCESS", self).exec()
+            else:
+                ModernMessageBox("ERRO", "Falha ao exportar arquivo.", "ERROR", self).exec()
 
     def save_full_config(self):
         for key, widget in self.config_widgets.items():
@@ -618,14 +654,19 @@ class MainWindow(QMainWindow):
             except: pass
         self.controller.config_manager.data["catalogo_especies"] = new_species
         self.controller.config_manager.save()
+
+        # Atualiza a UI do botão de conexão imediatamente
+        self.controller.update_browser_ui()
+
         ModernMessageBox("SUCESSO", "Todas as configurações foram salvas!", "SUCCESS", self).exec()
 
     def reset_config(self):
         dlg = ModernMessageBox("CONFIRMAÇÃO", "Tem certeza? Isso apagará todas as personalizações e restaurará os valores padrão.", "WARNING", self)
         dlg.btn_ok.setText("SIM, RESTAURAR")
         if dlg.exec():
-            self.controller.config_manager.reset_to_defaults()
+            self.controller.config_manager.reset_to_defaults(self.license_data)
             self.refresh_config_tab()
+            self.controller.update_browser_ui()
 
     def refresh_config_tab(self):
         for key, widget in self.config_widgets.items():

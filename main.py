@@ -2,10 +2,10 @@ import sys
 import os
 import ctypes
 from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QSplashScreen
-from PySide6.QtGui import QIcon, QPixmap, QColor
+from PySide6.QtGui import QIcon, QPixmap, QColor, QPainter, QPainterPath
 from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
-from core.constants import VERSION, IMG_DIR, resource_path
+from core.constants import VERSION, resource_path, CONFIG_FILE
 from services.license_manager import LicenseManager
 from services.updater import AutoUpdater
 
@@ -98,14 +98,48 @@ def check_license_and_updates(splash=None):
             return False, None
 
 def main():
+    # 0. Limpeza de Configurações (Sync Truth) - Garante que use dados da nuvem
+    if os.path.exists(CONFIG_FILE):
+        try:
+            os.remove(CONFIG_FILE)
+            print("Arquivo de configuração local removido para sincronização obrigatória.")
+        except Exception as e:
+            print(f"Erro ao remover config local: {e}")
+
     # 1. Criação da aplicação (necessário antes de diálogos e temas)
     app = QApplication(sys.argv)
     app.setApplicationName("AutoREAPv2")
 
     # --- TELA DE CARREGAMENTO (SPLASH SCREEN) ---
-    splash_pix = QPixmap(450, 300)
-    splash_pix.fill(QColor("#0F172A")) # Fundo Azul Escuro do Tema
-    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+    # Dimensões da Splash
+    w, h = 450, 300
+
+    # Tenta carregar imagem, senão usa cor sólida
+    splash_img_path = resource_path(os.path.join("img", "splashscreen.png"))
+
+    if os.path.exists(splash_img_path):
+        source_pix = QPixmap(splash_img_path)
+        # Escala mantendo aspecto e preenchendo (crop se necessário)
+        source_pix = source_pix.scaled(w, h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    else:
+        source_pix = QPixmap(w, h)
+        source_pix.fill(QColor("#0F172A")) # Fundo Azul Escuro do Tema
+
+    # Aplicar Cantos Arredondados (Rounded Corners)
+    final_pix = QPixmap(w, h)
+    final_pix.fill(Qt.transparent)
+
+    painter = QPainter(final_pix)
+    painter.setRenderHint(QPainter.Antialiasing)
+
+    path = QPainterPath()
+    path.addRoundedRect(0, 0, w, h, 20, 20) # Raio de 20px
+
+    painter.setClipPath(path)
+    painter.drawPixmap(0, 0, source_pix)
+    painter.end()
+
+    splash = QSplashScreen(final_pix, Qt.WindowStaysOnTopHint)
 
     # Configura fonte da splash
     font = splash.font()

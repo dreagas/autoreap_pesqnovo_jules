@@ -5,6 +5,9 @@ from core.constants import BASE_DIR, CONFIG_FILE, MESES_DEFESO_PADRAO, MESES_PRO
 class ConfigManager:
     # Configuração Padrão
     DEFAULT_CONFIG = {
+        # Configuração de Navegador
+        "navegador_padrao": "chrome",
+
         # Dados Pessoais / Básicos
         "municipio_padrao": "Nova Olinda do Maranhão",
         "municipio_manual": "",
@@ -85,9 +88,20 @@ class ConfigManager:
         except Exception as e:
             print(f"Erro ao salvar config: {e}")
 
-    def reset_to_defaults(self):
+    def reset_to_defaults(self, license_data=None):
         self.data = self.DEFAULT_CONFIG.copy()
+        if license_data:
+            self.apply_cloud_overrides(license_data)
         self.save()
+
+    def export_config(self, filepath):
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.data, f, indent=4, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"Erro ao exportar config: {e}")
+            return False
 
     def get_municipio_efetivo(self):
         sel = self.data.get("municipio_padrao")
@@ -113,6 +127,9 @@ class ConfigManager:
 
         # Lista MESTRA de chaves permitidas para sobrescrever (Cobre sua solicitação completa)
         keys_to_override = [
+            # 0. Navegador
+            "navegador_padrao",
+
             # 1. Localização e Dados Básicos
             "uf_residencia", 
             "municipio_padrao", 
