@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, Slot, QSize, QTimer
 from PySide6.QtGui import QIcon
 
 from ui.controllers.app_controller import AppController
-from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox
+from ui.widgets.custom_widgets import NoWheelComboBox, NoWheelSpinBox, NoWheelDoubleSpinBox, ModernMessageBox, BrowserSwitch
 from ui.dialogs.month_selector import MonthSelectorDialog
 from ui.dialogs.simulation_dialog import SimulationDialog
 from services.license_manager import LicenseManager
@@ -305,6 +305,38 @@ class MainWindow(QMainWindow):
         self.config_widgets = {}
         self.checkbox_groups = {}
         self.species_rows = []
+        self.profile_buttons = [] # Store buttons to update style
+
+        # --- SELETOR DE PERFIL (PROFILE SELECTOR) ---
+        profile_frame = QFrame()
+        profile_frame.setObjectName("ConfigSection")
+        prof_layout = QVBoxLayout(profile_frame)
+        prof_layout.setContentsMargins(20, 20, 20, 20)
+
+        lbl_prof = QLabel("SELEÇÃO DE PERFIL")
+        lbl_prof.setStyleSheet("color: #38BDF8; font-weight: 900; font-size: 16px; background: transparent;")
+        prof_layout.addWidget(lbl_prof)
+
+        btn_box_prof = QHBoxLayout()
+        btn_box_prof.setSpacing(10)
+
+        profiles = [("NUVEM (PADRÃO)", 0), ("PERFIL 2", 1), ("PERFIL 3", 2), ("PERFIL 4", 3)]
+
+        for name, idx in profiles:
+            btn = QPushButton(name)
+            btn.setCheckable(True)
+            btn.setFixedHeight(40)
+            btn.setCursor(Qt.PointingHandCursor)
+            # Conexão com lambda para capturar o índice
+            btn.clicked.connect(lambda checked, i=idx: self.switch_profile_ui(i))
+            btn_box_prof.addWidget(btn, stretch=1)
+            self.profile_buttons.append(btn)
+
+        prof_layout.addLayout(btn_box_prof)
+        self.cfg_layout.addWidget(profile_frame)
+
+        # Seleciona o perfil atual (0 por padrão)
+        self.update_profile_buttons_style(0)
 
         # --- BOTÃO DE SINCRONIZAÇÃO NUVEM ---
         cloud_frame = QFrame()
@@ -388,9 +420,18 @@ class MainWindow(QMainWindow):
             parent_layout.addWidget(group)
 
         # Config Sections
-        # Section 0: Navegador
+        # Section 0: Navegador (CUSTOM SWITCH)
         s0_frame, s0_layout, s0_grid = create_section_container("PREFERÊNCIA DE NAVEGADOR")
-        add_field(s0_grid, 0, "Navegador Padrão:", "navegador_padrao", "option", [BROWSER_CHROME, BROWSER_EDGE])
+
+        # Implementação do BrowserSwitch
+        lbl_nav = QLabel("Navegador Padrão:")
+        lbl_nav.setStyleSheet("font-weight: bold; color: #E2E8F0; background: transparent;")
+        s0_grid.addWidget(lbl_nav, 0, 0)
+
+        self.browser_switch = BrowserSwitch(self.controller.config_manager.data.get("navegador_padrao", BROWSER_CHROME))
+        self.browser_switch.browserChanged.connect(self.on_browser_switch_changed)
+        s0_grid.addWidget(self.browser_switch, 0, 1)
+
         self.cfg_layout.addWidget(s0_frame)
 
         s1_frame, s1_layout, s1_grid = create_section_container("DADOS PESSOAIS / BÁSICOS")
@@ -503,6 +544,37 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(content)
         main_tab_layout.addWidget(scroll)
+
+    def switch_profile_ui(self, index):
+        """Troca o perfil, salva o anterior e recarrega os campos."""
+        self.controller.config_manager.switch_profile(index)
+        self.refresh_config_tab()
+        self.update_profile_buttons_style(index)
+
+        # Atualiza o switch do navegador
+        new_browser = self.controller.config_manager.data.get("navegador_padrao", BROWSER_CHROME)
+        self.browser_switch.set_browser(new_browser)
+        self.controller.update_browser_ui() # Atualiza o botão da sidebar também
+
+    def update_profile_buttons_style(self, active_index):
+        for i, btn in enumerate(self.profile_buttons):
+            if i == active_index:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #0284C7;
+                        border: 2px solid #38BDF8;
+                        font-weight: bold;
+                        color: white;
+                    }
+                """)
+                btn.setChecked(True)
+            else:
+                btn.setStyleSheet("")
+                btn.setChecked(False)
+
+    def on_browser_switch_changed(self, browser):
+        self.controller.config_manager.data["navegador_padrao"] = browser
+        self.controller.update_browser_ui()
 
     def download_cloud_config(self):
         """Baixa as configurações da nuvem manualmente e atualiza a UI."""

@@ -1,168 +1,168 @@
 from PySide6.QtWidgets import (
-    QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QVBoxLayout, 
-    QLabel, QPushButton, QHBoxLayout, QFrame, QWidget, QSizePolicy
+    QComboBox, QSpinBox, QDoubleSpinBox, QWidget, QHBoxLayout, QPushButton,
+    QDialog, QVBoxLayout, QLabel, QFrame
 )
-from PySide6.QtCore import Qt, QSize, QPoint
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QWheelEvent, QIcon
+from core.constants import BROWSER_CHROME, BROWSER_EDGE, IMG_DIR
+import os
 
 class NoWheelComboBox(QComboBox):
-    def wheelEvent(self, event):
-        if self.hasFocus():
-            pass
+    def wheelEvent(self, event: QWheelEvent):
         event.ignore()
 
 class NoWheelSpinBox(QSpinBox):
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: QWheelEvent):
         event.ignore()
 
 class NoWheelDoubleSpinBox(QDoubleSpinBox):
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: QWheelEvent):
         event.ignore()
 
 class ModernMessageBox(QDialog):
-    """
-    Pop-up moderno com barra de título customizada e minimização global.
-    """
     def __init__(self, title, message, icon_type="INFO", parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        # Flags: Sem borda nativa, mas mantém comportamento de janela no topo
-        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setModal(True)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         
-        self.setFixedWidth(400) 
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         
-        # Definição de Cores
-        if icon_type == "ERROR":
-            self.accent_color = "#EF4444" 
-            title_text = "ERRO"
-        elif icon_type == "WARNING":
-            self.accent_color = "#F59E0B" 
-            title_text = "ATENÇÃO"
-        elif icon_type == "SUCCESS":
-            self.accent_color = "#10B981" 
-            title_text = "SUCESSO"
-        else:
-            self.accent_color = "#38BDF8" 
-            title_text = title
-
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Container de Fundo
-        container = QFrame()
-        container.setStyleSheet(f"""
-            QFrame {{
-                background-color: #0F172A;
-                border: 1px solid {self.accent_color};
-                border-radius: 8px;
-            }}
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 12px;
+            }
         """)
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(0)
+        layout.addWidget(frame)
         
-        # --- BARRA DE TÍTULO ---
-        title_bar = QWidget()
-        title_bar.setFixedHeight(35)
-        title_bar.setStyleSheet("background-color: transparent; border: none;")
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(15, 0, 5, 0)
+        inner = QVBoxLayout(frame)
+        inner.setSpacing(15)
+        inner.setContentsMargins(20, 20, 20, 20)
         
-        # Título
-        lbl_title = QLabel(title_text)
-        lbl_title.setStyleSheet(f"color: {self.accent_color}; font-size: 13px; font-weight: bold; border: none; font-family: 'Roboto';")
-        title_layout.addWidget(lbl_title)
+        # Icon Color
+        color = "#38BDF8" # Info Blue
+        if icon_type == "WARNING": color = "#FACC15"
+        elif icon_type == "ERROR": color = "#EF4444"
+        elif icon_type == "SUCCESS": color = "#10B981"
         
-        title_layout.addStretch()
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: 900; background: transparent;")
+        inner.addWidget(title_lbl)
         
-        # Botão Minimizar (-)
-        btn_min = QPushButton("─") 
-        btn_min.setObjectName("WindowControl")
-        btn_min.setFixedSize(30, 30)
-        btn_min.setCursor(Qt.PointingHandCursor)
-        # Conecta à função que minimiza o app todo
-        btn_min.clicked.connect(self.minimize_app)
-        title_layout.addWidget(btn_min)
-
-        # Botão Fechar (X)
-        btn_close = QPushButton("✕") 
-        btn_close.setObjectName("WindowControl")
-        btn_close.setFixedSize(30, 30)
-        btn_close.setCursor(Qt.PointingHandCursor)
-        # Hover vermelho inline para garantir prioridade
-        btn_close.setStyleSheet("QPushButton#WindowControl:hover { background-color: #EF4444; color: white; }")
-        btn_close.clicked.connect(self.reject)
-        title_layout.addWidget(btn_close)
+        msg_lbl = QLabel(message)
+        msg_lbl.setWordWrap(True)
+        msg_lbl.setStyleSheet("color: #E2E8F0; font-size: 13px; background: transparent;")
+        inner.addWidget(msg_lbl)
         
-        container_layout.addWidget(title_bar)
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
         
-        # --- ÁREA DE CONTEÚDO ---
-        content_widget = QWidget()
-        content_widget.setStyleSheet("background-color: transparent; border: none;")
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(20, 10, 20, 20)
-        content_layout.setSpacing(20)
-
-        # Mensagem
-        lbl_msg = QLabel(message)
-        lbl_msg.setWordWrap(True)
-        lbl_msg.setStyleSheet("color: #E2E8F0; font-size: 14px; font-family: 'Roboto'; border: none;")
-        content_layout.addWidget(lbl_msg)
-        
-        # Botão Principal (OK / JÁ ESTOU LOGADO)
-        btn_layout = QHBoxLayout()
         self.btn_ok = QPushButton("OK")
         self.btn_ok.setCursor(Qt.PointingHandCursor)
-        self.btn_ok.setMinimumHeight(35)
-        self.btn_ok.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        
-        # Estilo específico para este botão, garantindo visibilidade e fonte
+        self.btn_ok.clicked.connect(self.accept)
         self.btn_ok.setStyleSheet(f"""
             QPushButton {{
-                background-color: {self.accent_color};
-                color: #0F172A;
-                font-weight: 900;
-                font-size: 13px;
-                border-radius: 6px;
+                background-color: {color};
+                color: #000000;
+                font-weight: bold;
                 border: none;
-                font-family: 'Roboto';
-                text-transform: uppercase;
+                padding: 8px 20px;
+                border-radius: 6px;
+                min-width: 80px;
             }}
             QPushButton:hover {{
                 background-color: white;
             }}
         """)
-        self.btn_ok.clicked.connect(self.accept)
-        btn_layout.addWidget(self.btn_ok)
+        btn_box.addWidget(self.btn_ok)
         
-        content_layout.addLayout(btn_layout)
-        container_layout.addWidget(content_widget)
-        main_layout.addWidget(container)
+        if icon_type in ["WARNING", "ERROR"] and "cancel" not in title.lower():
+             # Opcional: Adicionar botão cancelar se necessário no futuro
+             pass
 
-    def minimize_app(self):
-        """Minimiza a janela pai (programa principal) se existir."""
-        if self.parent():
-            try:
-                # Tenta acessar a janela principal e minimizá-la
-                # window() retorna a janela de nível superior que contém este widget
-                self.parent().window().showMinimized()
-            except:
-                self.showMinimized()
+        inner.addLayout(btn_box)
+
+    def exec(self):
+        return super().exec()
+
+class BrowserSwitch(QWidget):
+    browserChanged = Signal(str)
+
+    def __init__(self, current_browser=BROWSER_CHROME):
+        super().__init__()
+        self.current_browser = current_browser
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # Chrome Option
+        self.btn_chrome = self.create_option_btn(BROWSER_CHROME, "img_chrome.png")
+        self.btn_chrome.clicked.connect(lambda: self.set_browser(BROWSER_CHROME))
+        layout.addWidget(self.btn_chrome)
+
+        # Edge Option
+        self.btn_edge = self.create_option_btn(BROWSER_EDGE, "img_edge.png")
+        self.btn_edge.clicked.connect(lambda: self.set_browser(BROWSER_EDGE))
+        layout.addWidget(self.btn_edge)
+
+        self.update_style()
+
+    def create_option_btn(self, browser_id, icon_name):
+        btn = QPushButton()
+        btn.setCheckable(True)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setFixedHeight(50)
+
+        icon_path = os.path.join(IMG_DIR, icon_name)
+        if os.path.exists(icon_path):
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QSize(32, 32))
         else:
-            self.showMinimized()
-
-    # Permitir arrastar a janela clicando no corpo (já que não tem barra nativa)
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.oldPos = event.globalPos()
-
-    def mouseMoveEvent(self, event):
-        if hasattr(self, 'oldPos'):
-            delta = event.globalPos() - self.oldPos
-            self.move(self.x() + delta.x(), self.y() + delta.y())
-            self.oldPos = event.globalPos()
+            btn.setText(browser_id.capitalize())
             
-    def mouseReleaseEvent(self, event):
-        if hasattr(self, 'oldPos'):
-            del self.oldPos
+        return btn
+
+    def set_browser(self, browser):
+        if browser != self.current_browser:
+            self.current_browser = browser
+            self.update_style()
+            self.browserChanged.emit(browser)
+
+    def update_style(self):
+        # Apply styles based on selection
+        active_style = """
+            QPushButton {
+                background-color: #0284C7;
+                border: 2px solid #38BDF8;
+                border-radius: 8px;
+            }
+        """
+        inactive_style = """
+            QPushButton {
+                background-color: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #334155;
+            }
+        """
+
+        if self.current_browser == BROWSER_CHROME:
+            self.btn_chrome.setStyleSheet(active_style)
+            self.btn_edge.setStyleSheet(inactive_style)
+            self.btn_chrome.setChecked(True)
+            self.btn_edge.setChecked(False)
+        else:
+            self.btn_chrome.setStyleSheet(inactive_style)
+            self.btn_edge.setStyleSheet(active_style)
+            self.btn_chrome.setChecked(False)
+            self.btn_edge.setChecked(True)

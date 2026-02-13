@@ -3,7 +3,7 @@ QWidget {
     background-color: #0F172A; /* Azul Escuro Profundo */
     color: #F1F5F9; /* Texto Claro */
     font-family: "Roboto", "Segoe UI", sans-serif;
-    font-size: 14px;
+    font-size: 13px; /* Reduzido de 14px */
     font-weight: normal; /* Reset de peso */
 }
 
@@ -18,18 +18,18 @@ QPushButton {
     color: #FFFFFF;
     border: 1px solid #475569;
     border-radius: 8px;
-    min-height: 45px;
+    min-height: 40px; /* Reduzido de 45px */
     
     /* Tipografia e Alinhamento */
     font-family: "Roboto", "Segoe UI", sans-serif;
-    font-size: 13px;
+    font-size: 12px; /* Reduzido de 13px */
     font-weight: normal; /* Normal por padrão */
     text-transform: uppercase;
     
     /* Centralização Absoluta */
     text-align: center;
     padding: 0 10px;
-    margin: 2px;
+    margin: 4px; /* Aumentado de 2px para dar respiro */
 }
 
 QPushButton:hover {
@@ -53,7 +53,7 @@ QPushButton#BoldButton {
     background-color: #0284C7; /* Azul Vivo */
     border-color: #0369A1;
     font-weight: 900; /* Extra Negrito */
-    font-size: 14px;
+    font-size: 13px; /* Reduzido de 14px */
     color: #FFFFFF;
 }
 QPushButton#BoldButton:hover {
@@ -66,7 +66,7 @@ QPushButton#WindowControl {
     border: none;
     min-height: 30px;
     max-width: 30px;
-    font-size: 18px; /* Fonte maior para o símbolo */
+    font-size: 16px; /* Reduzido de 18px */
     font-weight: bold;
     color: #94A3B8;
     margin: 0;
@@ -86,6 +86,7 @@ QComboBox {
     color: #FFFFFF;
     min-height: 35px;
     font-family: "Roboto", sans-serif;
+    font-size: 13px;
 }
 
 QComboBox:focus {
@@ -123,15 +124,15 @@ QComboBox QAbstractItemView {
 
 /* --- CHECKBOX --- */
 QCheckBox {
-    spacing: 10px;
+    spacing: 12px; /* Aumentado */
     color: #E2E8F0;
-    font-size: 14px;
+    font-size: 13px; /* Reduzido de 14px */
     font-family: "Roboto", sans-serif;
 }
 
 QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
+    width: 18px; /* Reduzido de 20px */
+    height: 18px;
     border-radius: 4px;
 }
 
@@ -149,7 +150,6 @@ QCheckBox::indicator:unchecked:hover {
 QCheckBox::indicator:checked {
     background-color: #38BDF8;
     border: 2px solid #38BDF8;
-    /* Se a imagem 'img/check.png' existir, ela aparece. Se não, fica um quadrado azul (fallback elegante) */
     image: url(img/check.png); 
 }
 
@@ -162,6 +162,7 @@ QLineEdit, QPlainTextEdit, QTextEdit {
     color: #FFFFFF;
     selection-background-color: #38BDF8;
     font-family: "Roboto", sans-serif;
+    font-size: 13px;
 }
 QLineEdit:focus {
     border: 1px solid #38BDF8;
@@ -173,7 +174,7 @@ QTextEdit#LogBox {
     border: 1px solid #334155;
     border-radius: 8px;
     font-family: "Consolas", monospace;
-    font-size: 12px;
+    font-size: 11px; /* Reduzido */
     color: #94A3B8;
 }
 
@@ -217,11 +218,12 @@ QTabWidget::pane {
 QTabBar::tab {
     background-color: #0F172A;
     color: #94A3B8;
-    padding: 10px 20px;
+    padding: 12px 24px; /* Aumentado o padding lateral */
     font-weight: bold;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
     font-family: "Roboto", sans-serif;
+    font-size: 13px;
 }
 QTabBar::tab:selected {
     background-color: #1E293B;

@@ -1,6 +1,6 @@
 import os
 import json
-from core.constants import BASE_DIR, CONFIG_FILE, MESES_DEFESO_PADRAO, MESES_PRODUCAO_PADRAO, TODOS_MESES_ORDENADOS
+from core.constants import BASE_DIR, CONFIG_FILE, PROFILES_FILE, MESES_DEFESO_PADRAO, MESES_PRODUCAO_PADRAO, TODOS_MESES_ORDENADOS
 
 class ConfigManager:
     # Configuração Padrão
@@ -55,43 +55,105 @@ class ConfigManager:
         ]
     }
 
+    # Perfil vazio para novos slots (apenas UF Maranhão setado conforme pedido)
+    EMPTY_PROFILE = {
+        "navegador_padrao": "chrome",
+        "municipio_padrao": "",
+        "municipio_manual": "",
+        "uf_residencia": "MARANHAO",
+        "categoria": "",
+        "forma_atuacao": "",
+        "relacao_trabalho": "",
+        "estado_comercializacao": "MARANHAO",
+        "grupos_alvo": [],
+        "compradores": [],
+        "local_pesca_tipo": "",
+        "uf_pesca": "MARANHAO",
+        "nome_local_pesca": "",
+        "metodos_pesca": [],
+        "dias_min": 0,
+        "dias_max": 0,
+        "meta_financeira_min": 0.0,
+        "meta_financeira_max": 0.0,
+        "variacao_peso_pct": 0.0,
+        "meses_selecionados": [],
+        "meses_defeso": MESES_DEFESO_PADRAO, # Mantem lógica padrão de meses
+        "meses_producao": MESES_PRODUCAO_PADRAO,
+        "catalogo_especies": []
+    }
+
     def __init__(self):
+        self.current_profile_index = 0 # 0=Nuvem, 1,2,3=Locais
         self.data = self.load()
+        self.local_profiles = self.load_local_profiles()
 
     def load(self):
         if not os.path.exists(BASE_DIR):
             try: os.makedirs(BASE_DIR)
             except: pass
 
+        # O perfil 0 sempre tenta carregar do arquivo principal (legacy behavior)
+        # Se não existir, usa DEFAULT
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     loaded = json.load(f)
                     config = self.DEFAULT_CONFIG.copy()
                     config.update(loaded)
-
-                    # Correção legada específica
-                    if "catalogo_especies" in config:
-                        for esp in config["catalogo_especies"]:
-                            if esp["nome"] == "Surubim":
-                                esp["nome"] = "Surubim ou Cachara"
-
                     return config
             except:
                 return self.DEFAULT_CONFIG.copy()
         return self.DEFAULT_CONFIG.copy()
 
+    def load_local_profiles(self):
+        # Estrutura: {"1": {...}, "2": {...}, "3": {...}} (Índices 1, 2, 3 no código)
+        if os.path.exists(PROFILES_FILE):
+            try:
+                with open(PROFILES_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except:
+                pass
+        return {}
+
     def save(self):
         try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=4, ensure_ascii=False)
+            if self.current_profile_index == 0:
+                # Salva no arquivo principal (Nuvem/Padrão)
+                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(self.data, f, indent=4, ensure_ascii=False)
+            else:
+                # Salva no profiles.json
+                self.local_profiles[str(self.current_profile_index)] = self.data
+                with open(PROFILES_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(self.local_profiles, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"Erro ao salvar config: {e}")
 
+    def switch_profile(self, index):
+        self.save() # Salva o atual antes de trocar
+        self.current_profile_index = index
+
+        if index == 0:
+            # Recarrega do arquivo principal (que representa o perfil Nuvem + Edições)
+            self.data = self.load()
+        else:
+            # Carrega do dicionário local
+            if str(index) in self.local_profiles:
+                self.data = self.local_profiles[str(index)]
+            else:
+                # Se não existe, cria novo zerado
+                self.data = self.EMPTY_PROFILE.copy()
+                self.local_profiles[str(index)] = self.data
+                self.save() # Persiste a criação
+
     def reset_to_defaults(self, license_data=None):
-        self.data = self.DEFAULT_CONFIG.copy()
-        if license_data:
-            self.apply_cloud_overrides(license_data)
+        if self.current_profile_index == 0:
+            self.data = self.DEFAULT_CONFIG.copy()
+            if license_data:
+                self.apply_cloud_overrides(license_data)
+        else:
+            self.data = self.EMPTY_PROFILE.copy()
+
         self.save()
 
     def export_config(self, filepath):
@@ -110,14 +172,10 @@ class ConfigManager:
         return sel
 
     def apply_cloud_overrides(self, license_data):
-        """
-        Aplica configurações vindas da nuvem (JSON da Licença).
-        Isso permite personalizar UF, Espécies, Municípios e Regras de Negócio por cliente.
-        """
-        if not license_data:
+        # Só aplica overrides no perfil 0 (Nuvem)
+        if self.current_profile_index != 0 or not license_data:
             return
 
-        # 1. Busca perfil de configuração no JSON
         perfil = license_data.get("perfil_config", {})
         if not perfil:
             return
@@ -125,53 +183,21 @@ class ConfigManager:
         print("Aplicando perfil de configuração da nuvem...")
         changed = False
 
-        # Lista MESTRA de chaves permitidas para sobrescrever (Cobre sua solicitação completa)
         keys_to_override = [
-            # 0. Navegador
             "navegador_padrao",
-
-            # 1. Localização e Dados Básicos
-            "uf_residencia", 
-            "municipio_padrao", 
-            "municipio_manual",
-            "categoria", 
-            "forma_atuacao",
-            
-            # 2. Detalhes da Atividade
-            "relacao_trabalho", 
-            "estado_comercializacao",
-            "grupos_alvo", 
-            "compradores",
-            
-            # 3. Regras de Tempo (Meses de realização e não realização)
-            "meses_defeso",   # Meses de não realização
-            "meses_producao", # Meses de realização
-            "dias_min", 
-            "dias_max",
-            
-            # 4. Local Específico da Pesca
-            "local_pesca_tipo", 
-            "uf_pesca", 
-            "nome_local_pesca",
-            "metodos_pesca", # Petrecho
-            
-            # 5. Resultado Anual (Espécies e Valores)
-            "catalogo_especies", 
-            "meta_financeira_min", 
-            "meta_financeira_max", 
-            "variacao_peso_pct"
+            "uf_residencia", "municipio_padrao", "municipio_manual", "categoria", "forma_atuacao",
+            "relacao_trabalho", "estado_comercializacao", "grupos_alvo", "compradores",
+            "meses_defeso", "meses_producao", "dias_min", "dias_max",
+            "local_pesca_tipo", "uf_pesca", "nome_local_pesca", "metodos_pesca",
+            "catalogo_especies", "meta_financeira_min", "meta_financeira_max", "variacao_peso_pct"
         ]
 
         for key in keys_to_override:
             if key in perfil:
-                # Verifica se o valor é diferente para evitar escritas desnecessárias,
-                # mas garante que a nuvem tem autoridade sobre o local.
-                # Para listas (como catalogo_especies), a comparação direta funciona bem em Python.
                 if self.data.get(key) != perfil[key]:
                     self.data[key] = perfil[key]
                     changed = True
         
-        # Salva se houve mudança para persistir nas próximas aberturas
         if changed:
             self.save()
             print("Configurações atualizadas via nuvem com sucesso.")

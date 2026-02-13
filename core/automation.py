@@ -554,6 +554,29 @@ class AutomationLogic:
                     return [(item['nome'], "Quilo (Kg)", str(item['peso']), f"{item['preco']:.2f}".replace('.', ',')) for item in producao]
         return [(item['nome'], "Quilo (Kg)", str(item['peso']), f"{item['preco']:.2f}".replace('.', ',')) for item in producao]
 
+    def verificar_preenchimento_etapa(self, nome_campo_chave):
+        """Verifica rapidamente se um campo chave da etapa está preenchido ou válido."""
+        try:
+            # Tenta achar inputs que estão marcados como inválidos pelo sistema (br-input danger)
+            invalidos = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'br-input') and contains(@class, 'danger')]")
+            if invalidos:
+                self.logger.warning("Campos inválidos detectados nesta etapa.")
+                return False
+
+            # Verifica se o campo chave tem valor
+            if nome_campo_chave:
+                try:
+                    elem = self.driver.find_element(By.NAME, nome_campo_chave)
+                    val = elem.get_attribute("value")
+                    if not val:
+                        self.logger.warning(f"Campo chave '{nome_campo_chave}' está vazio.")
+                        return False
+                except: pass # Se não achar pelo nome, tenta seguir
+
+            return True
+        except:
+            return True # Em caso de erro na verificação, assume true para não travar, mas loga
+
     def processar_etapa_1(self):
         self.logger.info(">>> Etapa 1: Dados Básicos <<<", extra={'tags': 'DESTAK'})
         self.check_stop()
@@ -579,6 +602,9 @@ class AutomationLogic:
             inp_emb = self.driver.find_element(By.NAME, "embarcado").find_element(By.XPATH, "./ancestor::div[contains(@class, 'br-select')]")
             self.selecionar_combo(inp_emb, self.cfg.data['forma_atuacao'])
 
+            if not self.verificar_preenchimento_etapa("uf"):
+                self.logger.error("Falha na validação da Etapa 1.")
+
             self.logger.info("Etapa 1 preenchida.")
         except Exception as e:
             self.logger.warning(f"Aviso Etapa 1: {e}")
@@ -598,6 +624,8 @@ class AutomationLogic:
             self.garantir_selecao_unica_combo("estadosComercializacao", self.cfg.data['estado_comercializacao'])
             self.garantir_checkbox_group("gruposAlvo", self.cfg.data['grupos_alvo'])
             self.garantir_checkbox_group("compradoresPescado", self.cfg.data['compradores'])
+
+            self.verificar_preenchimento_etapa(None) # Validação genérica
             self.logger.info("Etapa 2 preenchida.")
         except Exception as e:
             self.logger.error(f"Erro Etapa 2: {e}")

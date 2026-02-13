@@ -10,6 +10,7 @@ CHROME_DEBUG_PORT = 9222
 EDGE_DEBUG_PORT = 9555
 BASE_DIR = r"C:\chrome_reap"
 CONFIG_FILE = os.path.join(BASE_DIR, "autoreapmpa.json")
+PROFILES_FILE = os.path.join(BASE_DIR, "profiles.json")
 
 # Constantes de Navegador
 BROWSER_CHROME = "chrome"
